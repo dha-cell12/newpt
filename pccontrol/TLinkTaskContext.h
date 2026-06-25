@@ -15,6 +15,7 @@
 
 // --- Task Execution Context ---
 @interface TLinkTaskExecutionContext : NSObject
+@property (nonatomic, weak) id runtime;
 @property (nonatomic, strong) TLinkCancellationToken *cancellationToken;
 @property (nonatomic, assign) NSTimeInterval defaultTimeoutSeconds;
 @property (nonatomic, assign) NSUInteger defaultMaxOutputBytes;
@@ -23,6 +24,7 @@
 // --- Script Session ---
 @interface TLinkScriptSession : NSObject
 @property (nonatomic, assign) uint64_t generation;
+@property (nonatomic, weak) id runtime;
 @property (nonatomic, strong) TLinkCancellationToken *cancellationToken;
 @property (nonatomic, strong) TLinkTaskExecutionContext *taskContext;
 @end
