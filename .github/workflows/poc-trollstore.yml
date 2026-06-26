@@ -97,6 +97,8 @@ jobs:
           echo "Using app for embed: $APP"
           echo "--- embedded extension files ---"
           find "$APP/PlugIns/TouchPOCTunnel.appex" -maxdepth 2 -type f | sort
+          echo "--- re-sign app after embedding extension ---"
+          ldid -Sentitlements.plist "$APP/TouchPOC"
 
       - name: Package .tipa
         working-directory: poc-trollstore
@@ -135,6 +137,10 @@ jobs:
           unzip -l packages/TouchPOC.tipa | grep 'Payload/TouchPOC.app/Info.plist'
           unzip -l packages/TouchPOC.tipa | grep 'Payload/TouchPOC.app/PlugIns/TouchPOCTunnel.appex/Info.plist'
           unzip -l packages/TouchPOC.tipa | grep 'Payload/TouchPOC.app/PlugIns/TouchPOCTunnel.appex/TouchPOCTunnel'
+          echo "--- final app entitlements ---"
+          ldid -e "$APP/TouchPOC" || true
+          echo "--- final extension entitlements ---"
+          ldid -e "$APP/PlugIns/TouchPOCTunnel.appex/TouchPOCTunnel" || true
           ls -la packages
 
       - name: Locate artifact
