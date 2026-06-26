@@ -4,6 +4,18 @@
 <dict>
 	<key>platform-application</key>
 	<true/>
+	<key>com.apple.developer.team-identifier</key>
+	<string>TouchPOC</string>
+	<key>application-identifier</key>
+	<string>TouchPOC.com.poc.trollstore.touch.tunnel</string>
+	<key>keychain-access-groups</key>
+	<array>
+		<string>TouchPOC.com.poc.trollstore.touch</string>
+	</array>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.poc.trollstore.touch</string>
+	</array>
 	<key>com.apple.private.security.no-container</key>
 	<true/>
 	<key>com.apple.private.security.no-sandbox</key>

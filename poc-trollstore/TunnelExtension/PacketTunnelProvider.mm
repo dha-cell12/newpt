@@ -27,11 +27,26 @@ static void TPLog(NSString *fmt, ...)
     NSLog(@"[TouchPOCTunnel] %@", msg);
 }
 
-@interface TouchPOCTunnelProvider : NEPacketTunnelProvider
+__attribute__((constructor))
+static void TPExtensionImageLoaded(void)
+{
+    TPLog(@"extension image loaded");
+}
+
+@interface PacketTunnelProvider : NEPacketTunnelProvider
 @property (nonatomic, strong) NSTimer *heartbeatTimer;
 @end
 
-@implementation TouchPOCTunnelProvider
+@implementation PacketTunnelProvider
+
+- (instancetype)init
+{
+    self = [super init];
+    if (self) {
+        TPLog(@"provider init");
+    }
+    return self;
+}
 
 - (void)startTunnelWithOptions:(NSDictionary<NSString *,NSObject *> *)options
              completionHandler:(void (^)(NSError * _Nullable error))completionHandler
