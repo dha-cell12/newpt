@@ -117,7 +117,7 @@ void POCNEStatus(void (^completion)(NSString *status))
 
 void POCNEReadProviderLog(void (^completion)(NSString *status))
 {
-    NSString *path = @"/var/mobile/Library/Preferences/com.poc.trollstore.touch.tunnel.log";
+    NSString *path = @"/tmp/com.poc.trollstore.touch.tunnel.log";
     NSError *error = nil;
     NSString *log = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:&error];
     if (error || log.length == 0) {

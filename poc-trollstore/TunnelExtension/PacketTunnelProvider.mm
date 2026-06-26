@@ -3,7 +3,7 @@
 
 static NSString *TPLogPath(void)
 {
-    return @"/var/mobile/Library/Preferences/com.poc.trollstore.touch.tunnel.log";
+    return @"/tmp/com.poc.trollstore.touch.tunnel.log";
 }
 
 static void TPLog(NSString *fmt, ...)
@@ -41,12 +41,17 @@ static void TPLog(NSString *fmt, ...)
     NEPacketTunnelNetworkSettings *settings = [[NEPacketTunnelNetworkSettings alloc] initWithTunnelRemoteAddress:@"127.0.0.1"];
     settings.MTU = @(1280);
 
-    // Control-plane-only tunnel. Empty includedRoutes means this POC should not
-    // steal normal device traffic while still keeping the provider process alive.
+    // Minimal valid packet-tunnel settings. For this stage we prefer a real
+    // default route because some iOS builds reject an empty includedRoutes list
+    // and immediately disconnect the provider.
     NEIPv4Settings *ipv4 = [[NEIPv4Settings alloc] initWithAddresses:@[@"10.254.0.2"]
-                                                         subnetMasks:@[@"255.255.255.255"]];
-    ipv4.includedRoutes = @[];
+                                                         subnetMasks:@[@"255.255.255.0"]];
+    ipv4.includedRoutes = @[[NEIPv4Route defaultRoute]];
     settings.IPv4Settings = ipv4;
+
+    NEDNSSettings *dns = [[NEDNSSettings alloc] initWithServers:@[@"1.1.1.1", @"8.8.8.8"]];
+    dns.matchDomains = @[@""];
+    settings.DNSSettings = dns;
 
     [self setTunnelNetworkSettings:settings completionHandler:^(NSError * _Nullable error) {
         if (error) {
