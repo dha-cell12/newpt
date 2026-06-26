@@ -247,7 +247,7 @@
 {
     (void)sender;
     self.neLabel.text = @"NE: ping requested";
-    POCNESendPing(^(NSString *status) {
+    POCNESendFilePing(^(NSString *status) {
         if ([status containsString:@"<nil responseData>"] || [status containsString:@"<zero length responseData>"]) {
             POCNEStatus(^(NSString *vpnStatus) {
                 POCNEReadProviderLog(^(NSString *logStatus) {

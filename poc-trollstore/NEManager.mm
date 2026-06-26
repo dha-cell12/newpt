@@ -145,6 +145,33 @@ void POCNEReadProviderLog(void (^completion)(NSString *status))
     POCNEComplete(completion, [tail componentsJoinedByString:@"\n"]);
 }
 
+void POCNESendFilePing(void (^completion)(NSString *status))
+{
+    NSString *base = [POCNELogPath() stringByDeletingLastPathComponent];
+    NSString *commandPath = [base stringByAppendingPathComponent:@"command.txt"];
+    NSString *responsePath = [base stringByAppendingPathComponent:@"response.txt"];
+    NSError *error = nil;
+    [[NSFileManager defaultManager] createDirectoryAtPath:base withIntermediateDirectories:YES attributes:nil error:nil];
+    [[NSFileManager defaultManager] removeItemAtPath:responsePath error:nil];
+
+    NSString *command = [NSString stringWithFormat:@"ping:%@", [NSDate date]];
+    BOOL ok = [command writeToFile:commandPath atomically:YES encoding:NSUTF8StringEncoding error:&error];
+    if (!ok || error) {
+        POCNEComplete(completion, [NSString stringWithFormat:@"file ping write failed: %@", error]);
+        return;
+    }
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        NSError *readError = nil;
+        NSString *response = [NSString stringWithContentsOfFile:responsePath encoding:NSUTF8StringEncoding error:&readError];
+        if (readError || response.length == 0) {
+            POCNEComplete(completion, [NSString stringWithFormat:@"file ping no response: %@", readError]);
+            return;
+        }
+        POCNEComplete(completion, [NSString stringWithFormat:@"file provider replied: %@", response]);
+    });
+}
+
 void POCNESendPing(void (^completion)(NSString *status))
 {
     POCNELoadManager(^(NETunnelProviderManager *manager, NSError *error) {

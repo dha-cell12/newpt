@@ -1,14 +1,21 @@
 #import <Foundation/Foundation.h>
 #import <NetworkExtension/NetworkExtension.h>
 
+static NSURL *TPGroupURL(void)
+{
+    return [[NSFileManager defaultManager] containerURLForSecurityApplicationGroupIdentifier:@"group.com.poc.trollstore.touch"];
+}
+
+static NSString *TPGroupPath(NSString *name)
+{
+    NSURL *groupURL = TPGroupURL();
+    if (groupURL) return [[groupURL URLByAppendingPathComponent:name] path];
+    return [@"/tmp" stringByAppendingPathComponent:name];
+}
+
 static NSString *TPLogPath(void)
 {
-    NSFileManager *fm = [NSFileManager defaultManager];
-    NSURL *groupURL = [fm containerURLForSecurityApplicationGroupIdentifier:@"group.com.poc.trollstore.touch"];
-    if (groupURL) {
-        return [[groupURL URLByAppendingPathComponent:@"tunnel.log"] path];
-    }
-    return @"/tmp/com.poc.trollstore.touch.tunnel.log";
+    return TPGroupPath(@"tunnel.log");
 }
 
 static void TPLog(NSString *fmt, ...)
@@ -48,6 +55,7 @@ static void TPExtensionImageLoaded(void)
 
 @interface PacketTunnelProvider : NEPacketTunnelProvider
 @property (nonatomic, strong) NSTimer *heartbeatTimer;
+@property (nonatomic, copy) NSString *lastCommand;
 @end
 
 @implementation PacketTunnelProvider
@@ -91,7 +99,7 @@ static void TPExtensionImageLoaded(void)
         TPLog(@"tunnel settings applied; provider is alive");
         dispatch_async(dispatch_get_main_queue(), ^{
             [self.heartbeatTimer invalidate];
-            self.heartbeatTimer = [NSTimer scheduledTimerWithTimeInterval:5.0
+            self.heartbeatTimer = [NSTimer scheduledTimerWithTimeInterval:1.0
                                                                     target:self
                                                                   selector:@selector(heartbeatTick)
                                                                   userInfo:nil
@@ -142,6 +150,34 @@ static void TPExtensionImageLoaded(void)
 - (void)heartbeatTick
 {
     TPLog(@"heartbeat");
+    [self pollFileCommand];
+}
+
+- (void)pollFileCommand
+{
+    NSError *error = nil;
+    NSString *commandPath = TPGroupPath(@"command.txt");
+    NSString *responsePath = TPGroupPath(@"response.txt");
+    NSString *command = [NSString stringWithContentsOfFile:commandPath encoding:NSUTF8StringEncoding error:&error];
+    if (error || command.length == 0) return;
+    if ([command isEqualToString:self.lastCommand]) return;
+
+    self.lastCommand = command;
+    TPLog(@"fileCommand '%@'", command);
+
+    NSString *response = nil;
+    if ([command hasPrefix:@"ping:"]) {
+        response = [NSString stringWithFormat:@"pong:%@", [NSDate date]];
+    } else {
+        response = [NSString stringWithFormat:@"unknown:%@", command];
+    }
+
+    [[NSFileManager defaultManager] createDirectoryAtPath:[responsePath stringByDeletingLastPathComponent]
+                              withIntermediateDirectories:YES
+                                               attributes:nil
+                                                    error:nil];
+    BOOL ok = [response writeToFile:responsePath atomically:YES encoding:NSUTF8StringEncoding error:&error];
+    TPLog(@"fileResponse write ok=%d error=%@ response='%@'", ok ? 1 : 0, error, response);
 }
 
 @end
