@@ -248,7 +248,14 @@
     (void)sender;
     self.neLabel.text = @"NE: ping requested";
     POCNESendPing(^(NSString *status) {
-        [self setTunnelStatus:status prefix:@"Ping"];
+        if ([status containsString:@"<nil responseData>"] || [status containsString:@"<zero length responseData>"]) {
+            POCNEReadProviderLog(^(NSString *logStatus) {
+                NSString *combined = [NSString stringWithFormat:@"%@\n\nProvider log tail:\n%@", status, logStatus];
+                [self setTunnelStatus:combined prefix:@"Ping"];
+            });
+        } else {
+            [self setTunnelStatus:status prefix:@"Ping"];
+        }
     });
 }
 

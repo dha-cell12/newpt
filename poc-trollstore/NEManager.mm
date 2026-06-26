@@ -85,6 +85,26 @@ void POCNEStop(void (^completion)(NSString *status))
     });
 }
 
+void POCNEReadProviderLog(void (^completion)(NSString *status))
+{
+    NSString *path = @"/var/mobile/Library/Preferences/com.poc.trollstore.touch.tunnel.log";
+    NSError *error = nil;
+    NSString *log = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:&error];
+    if (error || log.length == 0) {
+        POCNEComplete(completion, [NSString stringWithFormat:@"provider log empty/error: %@", error]);
+        return;
+    }
+
+    NSArray<NSString *> *lines = [log componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]];
+    NSUInteger count = lines.count;
+    NSUInteger start = count > 8 ? count - 8 : 0;
+    NSMutableArray<NSString *> *tail = [NSMutableArray array];
+    for (NSUInteger i = start; i < count; i++) {
+        if (lines[i].length > 0) [tail addObject:lines[i]];
+    }
+    POCNEComplete(completion, [tail componentsJoinedByString:@"\n"]);
+}
+
 void POCNESendPing(void (^completion)(NSString *status))
 {
     POCNELoadManager(^(NETunnelProviderManager *manager, NSError *error) {
@@ -102,7 +122,15 @@ void POCNESendPing(void (^completion)(NSString *status))
                 POCNEComplete(completion, [NSString stringWithFormat:@"ping send failed: %@", sendError]);
                 return;
             }
-            NSString *response = [[NSString alloc] initWithData:responseData encoding:NSUTF8StringEncoding] ?: @"<empty>";
+            if (!responseData) {
+                POCNEComplete(completion, @"provider replied: <nil responseData>");
+                return;
+            }
+            if (responseData.length == 0) {
+                POCNEComplete(completion, @"provider replied: <zero length responseData>");
+                return;
+            }
+            NSString *response = [[NSString alloc] initWithData:responseData encoding:NSUTF8StringEncoding] ?: @"<non-utf8>";
             POCNEComplete(completion, [NSString stringWithFormat:@"provider replied: %@", response]);
         }];
     });
