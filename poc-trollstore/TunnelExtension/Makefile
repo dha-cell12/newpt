@@ -3,16 +3,16 @@ ARCHS = arm64
 
 include $(THEOS)/makefiles/common.mk
 
-BUNDLE_NAME = TouchPOCTunnel
+# Build the NetworkExtension provider as a real executable, then the workflow
+# packages it manually into TouchPOCTunnel.appex. Do not use bundle.mk here:
+# bundle.mk can produce a Mach-O bundle/dylib, while app extensions need a
+# launchable executable inside the .appex wrapper.
+TOOL_NAME = TouchPOCTunnel
 
 TouchPOCTunnel_FILES = PacketTunnelProvider.mm
 TouchPOCTunnel_FRAMEWORKS = Foundation NetworkExtension
-TouchPOCTunnel_RESOURCE_FILES = Info.plist
 TouchPOCTunnel_CFLAGS = -fobjc-arc -Wno-error
 TouchPOCTunnel_CODESIGN_FLAGS = -Sentitlements.plist
-TouchPOCTunnel_INSTALL_PATH = /Applications/TouchPOC.app/PlugIns
+TouchPOCTunnel_INSTALL_PATH = /usr/bin
 
-TouchPOCTunnel_BUNDLE_EXTENSION = appex
-BUNDLE_EXTENSION = appex
-
-include $(THEOS_MAKE_PATH)/bundle.mk
+include $(THEOS_MAKE_PATH)/tool.mk

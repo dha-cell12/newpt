@@ -83,20 +83,26 @@ jobs:
             echo "ERROR: TouchPOC.app not found before embedding extension."
             exit 1
           fi
-          EXT=$(find TunnelExtension/.theos -maxdepth 8 \( -name 'TouchPOCTunnel.appex' -o -name 'TouchPOCTunnel.bundle' \) -type d | head -n1)
-          if [ -z "$EXT" ]; then
-            echo "ERROR: TouchPOCTunnel appex/bundle not found."
-            find TunnelExtension/.theos -maxdepth 8 -type d | sort
+          BIN=$(find TunnelExtension/.theos -maxdepth 8 -type f -name 'TouchPOCTunnel' ! -path '*/dSYM/*' | head -n1)
+          if [ -z "$BIN" ]; then
+            echo "ERROR: TouchPOCTunnel executable not found."
+            find TunnelExtension/.theos -maxdepth 8 -type f | sort
             exit 1
           fi
-          mkdir -p "$APP/PlugIns"
-          rm -rf "$APP/PlugIns/TouchPOCTunnel.appex"
-          cp -R "$EXT" "$APP/PlugIns/TouchPOCTunnel.appex"
+          mkdir -p "$APP/PlugIns/TouchPOCTunnel.appex"
+          rm -rf "$APP/PlugIns/TouchPOCTunnel.appex"/*
+          cp TunnelExtension/Info.plist "$APP/PlugIns/TouchPOCTunnel.appex/Info.plist"
+          cp "$BIN" "$APP/PlugIns/TouchPOCTunnel.appex/TouchPOCTunnel"
+          chmod 755 "$APP/PlugIns/TouchPOCTunnel.appex/TouchPOCTunnel"
+          ldid -STunnelExtension/entitlements.plist "$APP/PlugIns/TouchPOCTunnel.appex/TouchPOCTunnel"
           test -f "$APP/PlugIns/TouchPOCTunnel.appex/Info.plist"
           test -f "$APP/PlugIns/TouchPOCTunnel.appex/TouchPOCTunnel"
           echo "Using app for embed: $APP"
+          echo "Using executable: $BIN"
           echo "--- embedded extension files ---"
           find "$APP/PlugIns/TouchPOCTunnel.appex" -maxdepth 2 -type f | sort
+          echo "--- embedded extension binary type ---"
+          file "$APP/PlugIns/TouchPOCTunnel.appex/TouchPOCTunnel" || true
           echo "--- re-sign app after embedding extension ---"
           ldid -Sentitlements.plist "$APP/TouchPOC"
 
