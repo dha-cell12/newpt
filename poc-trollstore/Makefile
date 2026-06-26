@@ -10,11 +10,11 @@ include $(THEOS)/makefiles/common.mk
 
 APPLICATION_NAME = TouchPOC
 
-TouchPOC_FILES = main.mm AppDelegate.mm ViewController.mm TouchInjector.mm POCSocketServer.mm
+TouchPOC_FILES = main.mm AppDelegate.mm ViewController.mm TouchInjector.mm POCSocketServer.mm NEManager.mm
 # Keep Info.plist inside TouchPOC.app root. TrollStore requires
 # Payload/TouchPOC.app/Info.plist in the final .tipa.
 TouchPOC_RESOURCE_FILES = Info.plist
-TouchPOC_FRAMEWORKS = UIKit CoreFoundation CoreGraphics AVFoundation
+TouchPOC_FRAMEWORKS = UIKit CoreFoundation CoreGraphics AVFoundation NetworkExtension
 TouchPOC_PRIVATE_FRAMEWORKS = IOKit
 TouchPOC_CFLAGS = -fobjc-arc -Wno-error -Wno-module-import-in-extern-c
 TouchPOC_CCFLAGS = -std=c++14

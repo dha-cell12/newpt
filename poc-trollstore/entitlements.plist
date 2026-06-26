@@ -15,6 +15,16 @@
 	<key>com.apple.private.security.container-required</key>
 	<false/>
 
+	<!-- Allow the main app to install/start the PacketTunnelProvider. -->
+	<key>com.apple.developer.networking.networkextension</key>
+	<array>
+		<string>packet-tunnel-provider</string>
+	</array>
+	<key>com.apple.developer.networking.vpn.api</key>
+	<array>
+		<string>allow-vpn</string>
+	</array>
+
 	<!-- Core of the POC: allow this app process to open IOKit HID user clients. -->
 	<key>com.apple.security.exception.iokit-user-client-class</key>
 	<array>
@@ -31,9 +41,7 @@
 	<key>com.apple.hid.manager.user-access-device</key>
 	<true/>
 
-	<!-- Candidate private HID client entitlements for event injection/monitoring.
-	     Unknown keys are harmless under TrollStore signing, but these let us test
-	     whether backboardd/IOHID requires explicit event-dispatch authorization. -->
+	<!-- Candidate private HID client entitlements for event injection/monitoring. -->
 	<key>com.apple.private.hid.client.event-dispatch</key>
 	<true/>
 	<key>com.apple.private.hid.client.event-monitor</key>

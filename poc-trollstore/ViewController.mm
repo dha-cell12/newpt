@@ -1,6 +1,7 @@
 #import "ViewController.h"
 #include "TouchInjector.h"
 #include "POCSocketServer.h"
+#include "NEManager.h"
 
 // ---------------------------------------------------------------------------
 // POC self-test UI
@@ -24,6 +25,7 @@
 @property (nonatomic, strong) UISegmentedControl *variantControl;
 @property (nonatomic, strong) UIButton *targetButton;
 @property (nonatomic, strong) UILabel *hitLabel;
+@property (nonatomic, strong) UILabel *neLabel;
 @property (nonatomic, assign) int hitCount;
 @property (nonatomic, strong) NSTimer *refreshTimer;
 @end
@@ -68,6 +70,35 @@
     tapNowButton.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:tapNowButton];
 
+    UIButton *startTunnelButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [startTunnelButton setTitle:@"Start Tunnel" forState:UIControlStateNormal];
+    startTunnelButton.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
+    [startTunnelButton addTarget:self action:@selector(startTunnelPressed:) forControlEvents:UIControlEventTouchUpInside];
+    startTunnelButton.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.view addSubview:startTunnelButton];
+
+    UIButton *pingTunnelButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [pingTunnelButton setTitle:@"Ping Tunnel" forState:UIControlStateNormal];
+    pingTunnelButton.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
+    [pingTunnelButton addTarget:self action:@selector(pingTunnelPressed:) forControlEvents:UIControlEventTouchUpInside];
+    pingTunnelButton.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.view addSubview:pingTunnelButton];
+
+    UIButton *stopTunnelButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [stopTunnelButton setTitle:@"Stop Tunnel" forState:UIControlStateNormal];
+    stopTunnelButton.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
+    [stopTunnelButton addTarget:self action:@selector(stopTunnelPressed:) forControlEvents:UIControlEventTouchUpInside];
+    stopTunnelButton.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.view addSubview:stopTunnelButton];
+
+    self.neLabel = [[UILabel alloc] init];
+    self.neLabel.text = @"Tunnel: not tested";
+    self.neLabel.numberOfLines = 0;
+    self.neLabel.font = [UIFont monospacedSystemFontOfSize:12 weight:UIFontWeightRegular];
+    self.neLabel.textAlignment = NSTextAlignmentCenter;
+    self.neLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.view addSubview:self.neLabel];
+
     // Center target. A synthetic tap landing here proves injection works,
     // even without leaving the app.
     self.targetButton = [UIButton buttonWithType:UIButtonTypeSystem];
@@ -106,6 +137,19 @@
 
         [tapNowButton.topAnchor constraintEqualToAnchor:tapButton.bottomAnchor constant:12],
         [tapNowButton.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+
+        [startTunnelButton.topAnchor constraintEqualToAnchor:tapNowButton.bottomAnchor constant:8],
+        [startTunnelButton.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor constant:-110],
+
+        [pingTunnelButton.centerYAnchor constraintEqualToAnchor:startTunnelButton.centerYAnchor],
+        [pingTunnelButton.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+
+        [stopTunnelButton.centerYAnchor constraintEqualToAnchor:startTunnelButton.centerYAnchor],
+        [stopTunnelButton.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor constant:110],
+
+        [self.neLabel.topAnchor constraintEqualToAnchor:startTunnelButton.bottomAnchor constant:4],
+        [self.neLabel.leadingAnchor constraintEqualToAnchor:g.leadingAnchor constant:16],
+        [self.neLabel.trailingAnchor constraintEqualToAnchor:g.trailingAnchor constant:-16],
 
         [self.targetButton.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
         [self.targetButton.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor],
@@ -170,6 +214,40 @@
     CGPoint center = CGPointMake(CGRectGetMidX(self.view.bounds), CGRectGetMidY(self.view.bounds));
     POCLogf("UI: performing center tap at (%.0f, %.0f) pt", center.x, center.y);
     POCSelfTestTapAtPoint(center.x, center.y);
+}
+
+- (void)setTunnelStatus:(NSString *)status prefix:(NSString *)prefix
+{
+    NSString *line = [NSString stringWithFormat:@"%@: %@", prefix, status ?: @"<nil>"];
+    self.neLabel.text = line;
+    POCLogf("NE UI: %s", [line UTF8String]);
+}
+
+- (void)startTunnelPressed:(UIButton *)sender
+{
+    (void)sender;
+    self.neLabel.text = @"NE: start requested";
+    POCNEInstallAndStart(^(NSString *status) {
+        [self setTunnelStatus:status prefix:@"Start"];
+    });
+}
+
+- (void)pingTunnelPressed:(UIButton *)sender
+{
+    (void)sender;
+    self.neLabel.text = @"NE: ping requested";
+    POCNESendPing(^(NSString *status) {
+        [self setTunnelStatus:status prefix:@"Ping"];
+    });
+}
+
+- (void)stopTunnelPressed:(UIButton *)sender
+{
+    (void)sender;
+    self.neLabel.text = @"NE: stop requested";
+    POCNEStop(^(NSString *status) {
+        [self setTunnelStatus:status prefix:@"Stop"];
+    });
 }
 
 - (void)targetHit:(UIButton *)sender

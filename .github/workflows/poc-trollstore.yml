@@ -58,6 +58,38 @@ jobs:
           fi
           test -f "$APP/Info.plist"
 
+      - name: Build tunnel extension
+        env:
+          THEOS: ${{ github.workspace }}/theos
+        working-directory: poc-trollstore/TunnelExtension
+        run: |
+          make clean || true
+          make stage FINALPACKAGE=1
+          echo "--- extension staging tree ---"
+          find .theos -maxdepth 8 -type d | sort
+
+      - name: Embed tunnel extension
+        working-directory: poc-trollstore
+        run: |
+          set -e
+          APP=$(find .theos -maxdepth 5 -name 'TouchPOC.app' -type d | head -n1)
+          if [ -z "$APP" ]; then
+            echo "ERROR: TouchPOC.app not found before embedding extension."
+            exit 1
+          fi
+          EXT=$(find TunnelExtension/.theos -maxdepth 8 \( -name 'TouchPOCTunnel.appex' -o -name 'TouchPOCTunnel.bundle' \) -type d | head -n1)
+          if [ -z "$EXT" ]; then
+            echo "ERROR: TouchPOCTunnel appex/bundle not found."
+            find TunnelExtension/.theos -maxdepth 8 -type d | sort
+            exit 1
+          fi
+          mkdir -p "$APP/PlugIns"
+          rm -rf "$APP/PlugIns/TouchPOCTunnel.appex"
+          cp -R "$EXT" "$APP/PlugIns/TouchPOCTunnel.appex"
+          cp TunnelExtension/Info.plist "$APP/PlugIns/TouchPOCTunnel.appex/Info.plist"
+          test -f "$APP/PlugIns/TouchPOCTunnel.appex/Info.plist"
+          test -f "$APP/PlugIns/TouchPOCTunnel.appex/TouchPOCTunnel"
+
       - name: Package .tipa
         working-directory: poc-trollstore
         run: |
