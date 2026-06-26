@@ -163,8 +163,16 @@ static void TPExtensionImageLoaded(void)
     NSError *error = nil;
     NSString *commandPath = TPGroupPath(@"command.txt");
     NSString *responsePath = TPGroupPath(@"response.txt");
+    static NSUInteger sPollTick = 0;
+    sPollTick++;
+    BOOL exists = [[NSFileManager defaultManager] fileExistsAtPath:commandPath];
     NSString *command = [NSString stringWithContentsOfFile:commandPath encoding:NSUTF8StringEncoding error:&error];
-    if (error || command.length == 0) return;
+    if (error || command.length == 0) {
+        if ((sPollTick % 5) == 0) {
+            TPLog(@"pollCommand empty tick=%lu exists=%d path=%@ error=%@", (unsigned long)sPollTick, exists ? 1 : 0, commandPath, error);
+        }
+        return;
+    }
     if ([command isEqualToString:self.lastCommand]) return;
 
     self.lastCommand = command;

@@ -171,7 +171,7 @@ void POCNESendFilePing(void (^completion)(NSString *status))
         NSError *readError = nil;
         NSString *response = [NSString stringWithContentsOfFile:responsePath encoding:NSUTF8StringEncoding error:&readError];
         if (readError || response.length == 0) {
-            POCNEComplete(completion, [NSString stringWithFormat:@"file ping no response: %@", readError]);
+            POCNEComplete(completion, [NSString stringWithFormat:@"file ping no response: %@\nbase=%@\ncommand=%@\necho=%@\nresponse=%@", readError, base, commandPath, echo ?: @"<nil>", responsePath]);
             return;
         }
         POCNEComplete(completion, [NSString stringWithFormat:@"file provider replied: %@", response]);
