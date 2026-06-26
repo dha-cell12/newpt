@@ -47,7 +47,10 @@ jobs:
           make stage FINALPACKAGE=1
           echo "--- staging tree ---"
           find .theos -maxdepth 4 -name '*.app' -type d || true
-          APP=$(find .theos -maxdepth 5 -name 'TouchPOC.app' -type d | head -n1)
+          APP=".theos/_/Applications/TouchPOC.app"
+          if [ ! -d "$APP" ]; then
+            APP=$(find .theos/_ -maxdepth 6 -name 'TouchPOC.app' -type d | head -n1)
+          fi
           if [ -z "$APP" ]; then
             echo "ERROR: TouchPOC.app not found after stage."
             exit 1
@@ -72,7 +75,10 @@ jobs:
         working-directory: poc-trollstore
         run: |
           set -e
-          APP=$(find .theos -maxdepth 5 -name 'TouchPOC.app' -type d | head -n1)
+          APP=".theos/_/Applications/TouchPOC.app"
+          if [ ! -d "$APP" ]; then
+            APP=$(find .theos/_ -maxdepth 6 -name 'TouchPOC.app' -type d | head -n1)
+          fi
           if [ -z "$APP" ]; then
             echo "ERROR: TouchPOC.app not found before embedding extension."
             exit 1
@@ -88,6 +94,7 @@ jobs:
           cp -R "$EXT" "$APP/PlugIns/TouchPOCTunnel.appex"
           test -f "$APP/PlugIns/TouchPOCTunnel.appex/Info.plist"
           test -f "$APP/PlugIns/TouchPOCTunnel.appex/TouchPOCTunnel"
+          echo "Using app for embed: $APP"
           echo "--- embedded extension files ---"
           find "$APP/PlugIns/TouchPOCTunnel.appex" -maxdepth 2 -type f | sort
 
@@ -96,7 +103,10 @@ jobs:
         run: |
           set -e
           # Find the signed .app produced by the stage step.
-          APP=$(find .theos -maxdepth 5 -name 'TouchPOC.app' -type d | head -n1)
+          APP=".theos/_/Applications/TouchPOC.app"
+          if [ ! -d "$APP" ]; then
+            APP=$(find .theos/_ -maxdepth 6 -name 'TouchPOC.app' -type d | head -n1)
+          fi
           if [ -z "$APP" ]; then
             echo "ERROR: TouchPOC.app not found in staging output."
             find .theos -maxdepth 5 -type d | head -100
