@@ -11,6 +11,9 @@ include $(THEOS)/makefiles/common.mk
 APPLICATION_NAME = TouchPOC
 
 TouchPOC_FILES = main.mm AppDelegate.mm ViewController.mm TouchInjector.mm POCSocketServer.mm
+# Keep Info.plist inside TouchPOC.app root. TrollStore requires
+# Payload/TouchPOC.app/Info.plist in the final .tipa.
+TouchPOC_RESOURCE_FILES = Info.plist
 TouchPOC_FRAMEWORKS = UIKit CoreFoundation CoreGraphics AVFoundation
 TouchPOC_PRIVATE_FRAMEWORKS = IOKit
 TouchPOC_CFLAGS = -fobjc-arc -Wno-error -Wno-module-import-in-extern-c
@@ -29,11 +32,15 @@ after-stage::
 	-@echo "[after-stage] attempting local .tipa packaging (best-effort)..."
 	-@APP=$$(find $(THEOS_STAGING_DIR) -maxdepth 3 -name 'TouchPOC.app' -type d | head -n1); \
 	  if [ -n "$$APP" ]; then \
+	    test -f "$$APP/Info.plist" || cp $(THEOS_PROJECT_DIR)/Info.plist "$$APP/Info.plist"; \
+	    test -f "$$APP/Info.plist" || { echo "[after-stage] ERROR: $$APP/Info.plist missing"; exit 1; }; \
 	    rm -rf $(THEOS_STAGING_DIR)/Payload && mkdir -p $(THEOS_STAGING_DIR)/Payload && \
 	    cp -R "$$APP" $(THEOS_STAGING_DIR)/Payload/TouchPOC.app && \
+	    test -f "$(THEOS_STAGING_DIR)/Payload/TouchPOC.app/Info.plist" || { echo "[after-stage] ERROR: Payload/TouchPOC.app/Info.plist missing"; exit 1; }; \
 	    mkdir -p $(THEOS_PROJECT_DIR)/packages && \
 	    rm -f $(THEOS_PROJECT_DIR)/packages/TouchPOC.tipa && \
 	    ( cd $(THEOS_STAGING_DIR) && zip -qr9 $(THEOS_PROJECT_DIR)/packages/TouchPOC.tipa Payload ) && \
+	    unzip -l $(THEOS_PROJECT_DIR)/packages/TouchPOC.tipa | grep -q 'Payload/TouchPOC.app/Info.plist' && \
 	    echo "[after-stage] wrote packages/TouchPOC.tipa"; \
 	  else \
 	    echo "[after-stage] TouchPOC.app not found; skipping (CI will package instead)"; \

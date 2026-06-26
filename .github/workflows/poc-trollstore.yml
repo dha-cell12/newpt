@@ -47,6 +47,16 @@ jobs:
           make stage FINALPACKAGE=1
           echo "--- staging tree ---"
           find .theos -maxdepth 4 -name '*.app' -type d || true
+          APP=$(find .theos -maxdepth 5 -name 'TouchPOC.app' -type d | head -n1)
+          if [ -z "$APP" ]; then
+            echo "ERROR: TouchPOC.app not found after stage."
+            exit 1
+          fi
+          if [ ! -f "$APP/Info.plist" ]; then
+            echo "Info.plist missing from staged app; copying project Info.plist into bundle root."
+            cp Info.plist "$APP/Info.plist"
+          fi
+          test -f "$APP/Info.plist"
 
       - name: Package .tipa
         working-directory: poc-trollstore
@@ -60,12 +70,26 @@ jobs:
             exit 1
           fi
           echo "Found app: $APP"
+          if [ ! -f "$APP/Info.plist" ]; then
+            echo "Info.plist missing from staged app; copying project Info.plist into bundle root."
+            cp Info.plist "$APP/Info.plist"
+          fi
+          if [ ! -f "$APP/Info.plist" ]; then
+            echo "ERROR: $APP/Info.plist is still missing. TrollStore will reject this package."
+            exit 1
+          fi
           rm -rf _payload
           mkdir -p _payload/Payload
           cp -R "$APP" _payload/Payload/TouchPOC.app
+          if [ ! -f _payload/Payload/TouchPOC.app/Info.plist ]; then
+            echo "ERROR: Payload/TouchPOC.app/Info.plist missing after copy."
+            find _payload -maxdepth 4 -type f | sort
+            exit 1
+          fi
           mkdir -p packages
           rm -f packages/TouchPOC.tipa
           ( cd _payload && zip -qr9 ../packages/TouchPOC.tipa Payload )
+          unzip -l packages/TouchPOC.tipa | grep 'Payload/TouchPOC.app/Info.plist'
           ls -la packages
 
       - name: Locate artifact
