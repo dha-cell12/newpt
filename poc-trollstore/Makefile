@@ -1,0 +1,40 @@
+# POC TrollStore touch-injection app.
+#
+# Builds a standalone iOS application (NOT a tweak), packaged for TrollStore.
+# Target iOS 15-16, arm64. No Substrate, no daemon, no SpringBoard injection.
+
+TARGET = iphone:clang:latest:15.0
+ARCHS = arm64
+
+include $(THEOS)/makefiles/common.mk
+
+APPLICATION_NAME = TouchPOC
+
+TouchPOC_FILES = main.mm AppDelegate.mm ViewController.mm TouchInjector.mm POCSocketServer.mm
+TouchPOC_FRAMEWORKS = UIKit CoreFoundation CoreGraphics AVFoundation
+TouchPOC_PRIVATE_FRAMEWORKS = IOKit
+TouchPOC_CFLAGS = -fobjc-arc -Wno-error -Wno-module-import-in-extern-c
+TouchPOC_CCFLAGS = -std=c++14
+TouchPOC_CODESIGN_FLAGS = -Sentitlements.plist
+TouchPOC_INSTALL_PATH = /Applications
+
+include $(THEOS_MAKE_PATH)/application.mk
+
+# Local convenience: after staging, also emit a TrollStore-installable .tipa by
+# wrapping the signed .app in a Payload/ directory. This is best-effort for
+# local builds; CI packages the .tipa independently and does not rely on this
+# hook. The leading '-' on each command keeps a hook failure from aborting the
+# overall build.
+after-stage::
+	-@echo "[after-stage] attempting local .tipa packaging (best-effort)..."
+	-@APP=$$(find $(THEOS_STAGING_DIR) -maxdepth 3 -name 'TouchPOC.app' -type d | head -n1); \
+	  if [ -n "$$APP" ]; then \
+	    rm -rf $(THEOS_STAGING_DIR)/Payload && mkdir -p $(THEOS_STAGING_DIR)/Payload && \
+	    cp -R "$$APP" $(THEOS_STAGING_DIR)/Payload/TouchPOC.app && \
+	    mkdir -p $(THEOS_PROJECT_DIR)/packages && \
+	    rm -f $(THEOS_PROJECT_DIR)/packages/TouchPOC.tipa && \
+	    ( cd $(THEOS_STAGING_DIR) && zip -qr9 $(THEOS_PROJECT_DIR)/packages/TouchPOC.tipa Payload ) && \
+	    echo "[after-stage] wrote packages/TouchPOC.tipa"; \
+	  else \
+	    echo "[after-stage] TouchPOC.app not found; skipping (CI will package instead)"; \
+	  fi

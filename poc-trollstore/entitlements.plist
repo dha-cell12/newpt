@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Grants the high-privilege execution context TrollStore can sign. -->
+	<key>platform-application</key>
+	<true/>
+	<key>com.apple.private.security.no-container</key>
+	<true/>
+
+	<!-- Core of the POC: allow this app process to open IOKit HID user clients
+	     so IOHIDEventSystemClient can create + dispatch digitizer events.
+	     The exact class names that matter on iOS 15-16 are the IOHIDEventSystem
+	     user clients; we allow the family broadly for the POC. -->
+	<key>com.apple.security.exception.iokit-user-client-class</key>
+	<array>
+		<string>IOHIDEventSystemUserClient</string>
+		<string>IOHIDLibUserClient</string>
+		<string>IOHIDUserDevice</string>
+	</array>
+
+	<!-- Allow talking to the HID event system service. -->
+	<key>com.apple.hid.system.user-access-service</key>
+	<true/>
+	<key>com.apple.hid.manager.user-access-device</key>
+	<true/>
+
+	<!-- Broad access often needed by TrollStore system utilities. -->
+	<key>com.apple.private.security.disk-device-access</key>
+	<true/>
+</dict>
+</plist>

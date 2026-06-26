@@ -1,0 +1,87 @@
+name: Build POC TrollStore App
+
+on:
+  push:
+    paths:
+      - 'poc-trollstore/**'
+      - '.github/workflows/poc-trollstore.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          brew install ldid xz
+
+      - name: Set up Theos
+        env:
+          THEOS: ${{ github.workspace }}/theos
+        run: |
+          git clone --quiet --recursive https://github.com/theos/theos.git "$THEOS"
+          echo "THEOS=$THEOS" >> "$GITHUB_ENV"
+
+      - name: Download iOS SDK
+        env:
+          THEOS: ${{ github.workspace }}/theos
+        run: |
+          cd "$THEOS/sdks"
+          curl -sL https://github.com/theos/sdks/archive/refs/heads/master.zip -o sdks.zip
+          unzip -q sdks.zip
+          mv sdks-master/*.sdk . || true
+          rm -rf sdks-master sdks.zip
+          ls -1
+
+      - name: Build and stage .app
+        env:
+          THEOS: ${{ github.workspace }}/theos
+        working-directory: poc-trollstore
+        run: |
+          # 'stage' compiles + signs the .app into the staging dir without
+          # producing a .deb. FINALPACKAGE strips debug symbols.
+          make clean || true
+          make stage FINALPACKAGE=1
+          echo "--- staging tree ---"
+          find .theos -maxdepth 4 -name '*.app' -type d || true
+
+      - name: Package .tipa
+        working-directory: poc-trollstore
+        run: |
+          set -e
+          # Find the signed .app produced by the stage step.
+          APP=$(find .theos -maxdepth 5 -name 'TouchPOC.app' -type d | head -n1)
+          if [ -z "$APP" ]; then
+            echo "ERROR: TouchPOC.app not found in staging output."
+            find .theos -maxdepth 5 -type d | head -100
+            exit 1
+          fi
+          echo "Found app: $APP"
+          rm -rf _payload
+          mkdir -p _payload/Payload
+          cp -R "$APP" _payload/Payload/TouchPOC.app
+          mkdir -p packages
+          rm -f packages/TouchPOC.tipa
+          ( cd _payload && zip -qr9 ../packages/TouchPOC.tipa Payload )
+          ls -la packages
+
+      - name: Locate artifact
+        id: artifact
+        working-directory: poc-trollstore
+        run: |
+          FILE=$(ls -1 packages/*.tipa 2>/dev/null | head -n1 || true)
+          if [ -z "$FILE" ]; then
+            echo "No .tipa produced."
+            exit 1
+          fi
+          echo "path=poc-trollstore/$FILE" >> "$GITHUB_OUTPUT"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TouchPOC-tipa
+          path: ${{ steps.artifact.outputs.path }}
+          if-no-files-found: error
