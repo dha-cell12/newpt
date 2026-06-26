@@ -115,9 +115,19 @@ void POCNEStatus(void (^completion)(NSString *status))
     });
 }
 
+static NSString *POCNELogPath(void)
+{
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSURL *groupURL = [fm containerURLForSecurityApplicationGroupIdentifier:@"group.com.poc.trollstore.touch"];
+    if (groupURL) {
+        return [[groupURL URLByAppendingPathComponent:@"tunnel.log"] path];
+    }
+    return @"/tmp/com.poc.trollstore.touch.tunnel.log";
+}
+
 void POCNEReadProviderLog(void (^completion)(NSString *status))
 {
-    NSString *path = @"/tmp/com.poc.trollstore.touch.tunnel.log";
+    NSString *path = POCNELogPath();
     NSError *error = nil;
     NSString *log = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:&error];
     if (error || log.length == 0) {
@@ -145,13 +155,9 @@ void POCNESendPing(void (^completion)(NSString *status))
 
         NSData *msg = [@"ping" dataUsingEncoding:NSUTF8StringEncoding];
         NSError *sendError = nil;
-        [(NETunnelProviderSession *)manager.connection sendProviderMessage:msg
-                                                               returnError:&sendError
-                                                           responseHandler:^(NSData *responseData) {
-            if (sendError) {
-                POCNEComplete(completion, [NSString stringWithFormat:@"ping send failed: %@", sendError]);
-                return;
-            }
+        BOOL sent = [(NETunnelProviderSession *)manager.connection sendProviderMessage:msg
+                                                                           returnError:&sendError
+                                                                       responseHandler:^(NSData *responseData) {
             if (!responseData) {
                 POCNEComplete(completion, @"provider replied: <nil responseData>");
                 return;
@@ -163,5 +169,12 @@ void POCNESendPing(void (^completion)(NSString *status))
             NSString *response = [[NSString alloc] initWithData:responseData encoding:NSUTF8StringEncoding] ?: @"<non-utf8>";
             POCNEComplete(completion, [NSString stringWithFormat:@"provider replied: %@", response]);
         }];
+
+        if (!sent || sendError) {
+            NSString *line = [NSString stringWithFormat:@"ping send returned NO error=%@ status=%@",
+                              sendError,
+                              POCNEStatusName(manager.connection.status)];
+            POCNEComplete(completion, line);
+        }
     });
 }

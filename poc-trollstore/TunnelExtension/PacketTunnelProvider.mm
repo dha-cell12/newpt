@@ -3,6 +3,11 @@
 
 static NSString *TPLogPath(void)
 {
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSURL *groupURL = [fm containerURLForSecurityApplicationGroupIdentifier:@"group.com.poc.trollstore.touch"];
+    if (groupURL) {
+        return [[groupURL URLByAppendingPathComponent:@"tunnel.log"] path];
+    }
     return @"/tmp/com.poc.trollstore.touch.tunnel.log";
 }
 
@@ -16,9 +21,17 @@ static void TPLog(NSString *fmt, ...)
     NSString *line = [NSString stringWithFormat:@"%@ %@\n", [NSDate date], msg];
     NSData *data = [line dataUsingEncoding:NSUTF8StringEncoding];
 
-    NSFileHandle *fh = [NSFileHandle fileHandleForWritingAtPath:TPLogPath()];
+    NSString *path = TPLogPath();
+    [[NSFileManager defaultManager] createDirectoryAtPath:[path stringByDeletingLastPathComponent]
+                              withIntermediateDirectories:YES
+                                               attributes:nil
+                                                    error:nil];
+    NSFileHandle *fh = [NSFileHandle fileHandleForWritingAtPath:path];
     if (!fh) {
-        [data writeToFile:TPLogPath() atomically:YES];
+        BOOL ok = [data writeToFile:path atomically:YES];
+        if (!ok) {
+            NSLog(@"[TouchPOCTunnel] failed to write log to %@", path);
+        }
     } else {
         [fh seekToEndOfFile];
         [fh writeData:data];
