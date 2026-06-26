@@ -11,6 +11,19 @@ static void POCNEComplete(void (^completion)(NSString *status), NSString *status
     });
 }
 
+static NSString *POCNEStatusName(NEVPNStatus status)
+{
+    switch (status) {
+        case NEVPNStatusInvalid: return @"Invalid";
+        case NEVPNStatusDisconnected: return @"Disconnected";
+        case NEVPNStatusConnecting: return @"Connecting";
+        case NEVPNStatusConnected: return @"Connected";
+        case NEVPNStatusReasserting: return @"Reasserting";
+        case NEVPNStatusDisconnecting: return @"Disconnecting";
+        default: return [NSString stringWithFormat:@"Unknown(%ld)", (long)status];
+    }
+}
+
 static void POCNELoadManager(void (^completion)(NETunnelProviderManager *manager, NSError *error))
 {
     [NETunnelProviderManager loadAllFromPreferencesWithCompletionHandler:^(NSArray<NETunnelProviderManager *> *managers, NSError *error) {
@@ -82,6 +95,23 @@ void POCNEStop(void (^completion)(NSString *status))
         }
         [manager.connection stopVPNTunnel];
         POCNEComplete(completion, @"tunnel stop requested");
+    });
+}
+
+void POCNEStatus(void (^completion)(NSString *status))
+{
+    POCNELoadManager(^(NETunnelProviderManager *manager, NSError *error) {
+        if (error || !manager) {
+            POCNEComplete(completion, [NSString stringWithFormat:@"status load failed: %@", error]);
+            return;
+        }
+        NETunnelProviderProtocol *proto = (NETunnelProviderProtocol *)manager.protocolConfiguration;
+        NSString *line = [NSString stringWithFormat:@"enabled=%@ status=%@ provider=%@ desc=%@",
+                          manager.enabled ? @"YES" : @"NO",
+                          POCNEStatusName(manager.connection.status),
+                          proto.providerBundleIdentifier ?: @"<nil>",
+                          manager.localizedDescription ?: @"<nil>"];
+        POCNEComplete(completion, line);
     });
 }
 
