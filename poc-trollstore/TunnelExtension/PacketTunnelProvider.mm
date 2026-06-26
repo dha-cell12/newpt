@@ -1,5 +1,6 @@
 #import <Foundation/Foundation.h>
 #import <NetworkExtension/NetworkExtension.h>
+#import <sys/stat.h>
 
 static NSString *TPSharedDir(void)
 {
@@ -34,6 +35,7 @@ static void TPLog(NSString *fmt, ...)
                               withIntermediateDirectories:YES
                                                attributes:nil
                                                     error:nil];
+    chmod([[path stringByDeletingLastPathComponent] fileSystemRepresentation], 0777);
     NSFileHandle *fh = [NSFileHandle fileHandleForWritingAtPath:path];
     if (!fh) {
         BOOL ok = [data writeToFile:path atomically:YES];
@@ -167,8 +169,17 @@ static void TPExtensionImageLoaded(void)
     sPollTick++;
     BOOL exists = [[NSFileManager defaultManager] fileExistsAtPath:commandPath];
     NSString *command = [NSString stringWithContentsOfFile:commandPath encoding:NSUTF8StringEncoding error:&error];
+    NSString *statePath = TPGroupPath(@"poll_state.txt");
+    NSString *state = [NSString stringWithFormat:@"tick=%lu\nexists=%d\ncommandPath=%@\nerror=%@\ncommand=%@\n",
+                       (unsigned long)sPollTick,
+                       exists ? 1 : 0,
+                       commandPath,
+                       error,
+                       command ?: @"<nil>"];
+    [state writeToFile:statePath atomically:YES encoding:NSUTF8StringEncoding error:nil];
+
     if (error || command.length == 0) {
-        if ((sPollTick % 5) == 0) {
+        if ((sPollTick % 1) == 0) {
             TPLog(@"pollCommand empty tick=%lu exists=%d path=%@ error=%@", (unsigned long)sPollTick, exists ? 1 : 0, commandPath, error);
         }
         return;

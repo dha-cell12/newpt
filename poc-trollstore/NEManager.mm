@@ -1,5 +1,6 @@
 #import "NEManager.h"
 #import <NetworkExtension/NetworkExtension.h>
+#import <sys/stat.h>
 
 static NSString * const kPOCDescription = @"TouchPOC Packet Tunnel";
 static NSString * const kPOCProviderBundleID = @"com.poc.trollstore.touch.tunnel";
@@ -157,21 +158,25 @@ void POCNESendFilePing(void (^completion)(NSString *status))
     NSString *responsePath = POCNESharedPath(@"response.txt");
     NSError *error = nil;
     [[NSFileManager defaultManager] createDirectoryAtPath:base withIntermediateDirectories:YES attributes:nil error:nil];
+    chmod([base fileSystemRepresentation], 0777);
     [[NSFileManager defaultManager] removeItemAtPath:responsePath error:nil];
 
     NSString *command = [NSString stringWithFormat:@"ping:%@", [NSDate date]];
-    BOOL ok = [command writeToFile:commandPath atomically:YES encoding:NSUTF8StringEncoding error:&error];
+    BOOL ok = [command writeToFile:commandPath atomically:NO encoding:NSUTF8StringEncoding error:&error];
+    chmod([commandPath fileSystemRepresentation], 0666);
     NSString *echo = [NSString stringWithContentsOfFile:commandPath encoding:NSUTF8StringEncoding error:nil];
     if (!ok || error) {
         POCNEComplete(completion, [NSString stringWithFormat:@"file ping write failed: %@ path=%@", error, commandPath]);
         return;
     }
 
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(4.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         NSError *readError = nil;
         NSString *response = [NSString stringWithContentsOfFile:responsePath encoding:NSUTF8StringEncoding error:&readError];
         if (readError || response.length == 0) {
-            POCNEComplete(completion, [NSString stringWithFormat:@"file ping no response: %@\nbase=%@\ncommand=%@\necho=%@\nresponse=%@", readError, base, commandPath, echo ?: @"<nil>", responsePath]);
+            NSString *pollPath = POCNESharedPath(@"poll_state.txt");
+            NSString *poll = [NSString stringWithContentsOfFile:pollPath encoding:NSUTF8StringEncoding error:nil] ?: @"<nil>";
+            POCNEComplete(completion, [NSString stringWithFormat:@"file ping no response: %@\nbase=%@\ncommand=%@\necho=%@\nresponse=%@\npoll=%@", readError, base, commandPath, echo ?: @"<nil>", responsePath, poll]);
             return;
         }
         POCNEComplete(completion, [NSString stringWithFormat:@"file provider replied: %@", response]);
