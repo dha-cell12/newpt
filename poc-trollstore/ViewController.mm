@@ -221,6 +221,17 @@
     NSString *line = [NSString stringWithFormat:@"%@: %@", prefix, status ?: @"<nil>"];
     self.neLabel.text = line;
     POCLogf("NE UI: %s", [line UTF8String]);
+
+    UIAlertController *alert =
+        [UIAlertController alertControllerWithTitle:@"NetworkExtension"
+                                            message:line
+                                     preferredStyle:UIAlertControllerStyleAlert];
+
+    [alert addAction:[UIAlertAction actionWithTitle:@"OK"
+                                              style:UIAlertActionStyleDefault
+                                            handler:nil]];
+
+    [self presentViewController:alert animated:YES completion:nil];
 }
 
 - (void)startTunnelPressed:(UIButton *)sender
