@@ -1,16 +1,17 @@
 #import <Foundation/Foundation.h>
 #import <NetworkExtension/NetworkExtension.h>
 
-static NSURL *TPGroupURL(void)
+static NSString *TPSharedDir(void)
 {
-    return [[NSFileManager defaultManager] containerURLForSecurityApplicationGroupIdentifier:@"group.com.poc.trollstore.touch"];
+    // Use a fixed shared path for this TrollStore/no-container POC. App Group
+    // containers can resolve differently or be unavailable across the main app
+    // and the manually packaged provider extension.
+    return @"/var/mobile/Library/TouchPOCShared";
 }
 
 static NSString *TPGroupPath(NSString *name)
 {
-    NSURL *groupURL = TPGroupURL();
-    if (groupURL) return [[groupURL URLByAppendingPathComponent:name] path];
-    return [@"/tmp" stringByAppendingPathComponent:name];
+    return [TPSharedDir() stringByAppendingPathComponent:name];
 }
 
 static NSString *TPLogPath(void)
@@ -72,7 +73,11 @@ static void TPExtensionImageLoaded(void)
 - (void)startTunnelWithOptions:(NSDictionary<NSString *,NSObject *> *)options
              completionHandler:(void (^)(NSError * _Nullable error))completionHandler
 {
-    TPLog(@"startTunnel options=%@", options);
+    TPLog(@"startTunnel options=%@ sharedDir=%@ commandPath=%@ responsePath=%@",
+          options,
+          TPSharedDir(),
+          TPGroupPath(@"command.txt"),
+          TPGroupPath(@"response.txt"));
 
     NEPacketTunnelNetworkSettings *settings = [[NEPacketTunnelNetworkSettings alloc] initWithTunnelRemoteAddress:@"127.0.0.1"];
     settings.MTU = @(1280);

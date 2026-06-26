@@ -115,14 +115,19 @@ void POCNEStatus(void (^completion)(NSString *status))
     });
 }
 
+static NSString *POCNESharedDir(void)
+{
+    return @"/var/mobile/Library/TouchPOCShared";
+}
+
+static NSString *POCNESharedPath(NSString *name)
+{
+    return [POCNESharedDir() stringByAppendingPathComponent:name];
+}
+
 static NSString *POCNELogPath(void)
 {
-    NSFileManager *fm = [NSFileManager defaultManager];
-    NSURL *groupURL = [fm containerURLForSecurityApplicationGroupIdentifier:@"group.com.poc.trollstore.touch"];
-    if (groupURL) {
-        return [[groupURL URLByAppendingPathComponent:@"tunnel.log"] path];
-    }
-    return @"/tmp/com.poc.trollstore.touch.tunnel.log";
+    return POCNESharedPath(@"tunnel.log");
 }
 
 void POCNEReadProviderLog(void (^completion)(NSString *status))
@@ -147,17 +152,18 @@ void POCNEReadProviderLog(void (^completion)(NSString *status))
 
 void POCNESendFilePing(void (^completion)(NSString *status))
 {
-    NSString *base = [POCNELogPath() stringByDeletingLastPathComponent];
-    NSString *commandPath = [base stringByAppendingPathComponent:@"command.txt"];
-    NSString *responsePath = [base stringByAppendingPathComponent:@"response.txt"];
+    NSString *base = POCNESharedDir();
+    NSString *commandPath = POCNESharedPath(@"command.txt");
+    NSString *responsePath = POCNESharedPath(@"response.txt");
     NSError *error = nil;
     [[NSFileManager defaultManager] createDirectoryAtPath:base withIntermediateDirectories:YES attributes:nil error:nil];
     [[NSFileManager defaultManager] removeItemAtPath:responsePath error:nil];
 
     NSString *command = [NSString stringWithFormat:@"ping:%@", [NSDate date]];
     BOOL ok = [command writeToFile:commandPath atomically:YES encoding:NSUTF8StringEncoding error:&error];
+    NSString *echo = [NSString stringWithContentsOfFile:commandPath encoding:NSUTF8StringEncoding error:nil];
     if (!ok || error) {
-        POCNEComplete(completion, [NSString stringWithFormat:@"file ping write failed: %@", error]);
+        POCNEComplete(completion, [NSString stringWithFormat:@"file ping write failed: %@ path=%@", error, commandPath]);
         return;
     }
 
