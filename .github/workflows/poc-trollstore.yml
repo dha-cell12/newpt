@@ -86,9 +86,10 @@ jobs:
           mkdir -p "$APP/PlugIns"
           rm -rf "$APP/PlugIns/TouchPOCTunnel.appex"
           cp -R "$EXT" "$APP/PlugIns/TouchPOCTunnel.appex"
-          cp TunnelExtension/Info.plist "$APP/PlugIns/TouchPOCTunnel.appex/Info.plist"
           test -f "$APP/PlugIns/TouchPOCTunnel.appex/Info.plist"
           test -f "$APP/PlugIns/TouchPOCTunnel.appex/TouchPOCTunnel"
+          echo "--- embedded extension files ---"
+          find "$APP/PlugIns/TouchPOCTunnel.appex" -maxdepth 2 -type f | sort
 
       - name: Package .tipa
         working-directory: poc-trollstore
@@ -122,6 +123,8 @@ jobs:
           rm -f packages/TouchPOC.tipa
           ( cd _payload && zip -qr9 ../packages/TouchPOC.tipa Payload )
           unzip -l packages/TouchPOC.tipa | grep 'Payload/TouchPOC.app/Info.plist'
+          unzip -l packages/TouchPOC.tipa | grep 'Payload/TouchPOC.app/PlugIns/TouchPOCTunnel.appex/Info.plist'
+          unzip -l packages/TouchPOC.tipa | grep 'Payload/TouchPOC.app/PlugIns/TouchPOCTunnel.appex/TouchPOCTunnel'
           ls -la packages
 
       - name: Locate artifact

@@ -7,6 +7,7 @@ BUNDLE_NAME = TouchPOCTunnel
 
 TouchPOCTunnel_FILES = PacketTunnelProvider.mm
 TouchPOCTunnel_FRAMEWORKS = Foundation NetworkExtension
+TouchPOCTunnel_RESOURCE_FILES = Info.plist
 TouchPOCTunnel_CFLAGS = -fobjc-arc -Wno-error
 TouchPOCTunnel_CODESIGN_FLAGS = -Sentitlements.plist
 TouchPOCTunnel_INSTALL_PATH = /Applications/TouchPOC.app/PlugIns
