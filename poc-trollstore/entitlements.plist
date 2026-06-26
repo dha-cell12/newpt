@@ -5,25 +5,53 @@
 	<!-- Grants the high-privilege execution context TrollStore can sign. -->
 	<key>platform-application</key>
 	<true/>
+
+	<!-- POC should be as unsandboxed as possible. Keep both names because
+	     different TrollStore examples/tools use different private switches. -->
 	<key>com.apple.private.security.no-container</key>
 	<true/>
+	<key>com.apple.private.security.no-sandbox</key>
+	<true/>
+	<key>com.apple.private.security.container-required</key>
+	<false/>
 
-	<!-- Core of the POC: allow this app process to open IOKit HID user clients
-	     so IOHIDEventSystemClient can create + dispatch digitizer events.
-	     The exact class names that matter on iOS 15-16 are the IOHIDEventSystem
-	     user clients; we allow the family broadly for the POC. -->
+	<!-- Core of the POC: allow this app process to open IOKit HID user clients. -->
 	<key>com.apple.security.exception.iokit-user-client-class</key>
 	<array>
 		<string>IOHIDEventSystemUserClient</string>
 		<string>IOHIDLibUserClient</string>
 		<string>IOHIDUserDevice</string>
+		<string>IOHIDResourceUserClient</string>
+		<string>IOHIDParamUserClient</string>
 	</array>
 
-	<!-- Allow talking to the HID event system service. -->
+	<!-- HID service/device access. -->
 	<key>com.apple.hid.system.user-access-service</key>
 	<true/>
 	<key>com.apple.hid.manager.user-access-device</key>
 	<true/>
+
+	<!-- Candidate private HID client entitlements for event injection/monitoring.
+	     Unknown keys are harmless under TrollStore signing, but these let us test
+	     whether backboardd/IOHID requires explicit event-dispatch authorization. -->
+	<key>com.apple.private.hid.client.event-dispatch</key>
+	<true/>
+	<key>com.apple.private.hid.client.event-monitor</key>
+	<true/>
+	<key>com.apple.private.hid.client.event-filter</key>
+	<true/>
+	<key>com.apple.private.hid.client.service-protected</key>
+	<true/>
+	<key>com.apple.private.hid.manager.client</key>
+	<true/>
+
+	<!-- Candidate service lookups used by HID/backboard paths on some builds. -->
+	<key>com.apple.security.exception.mach-lookup.global-name</key>
+	<array>
+		<string>com.apple.backboard.hid.services</string>
+		<string>com.apple.backboardservices</string>
+		<string>com.apple.iohideventsystem</string>
+	</array>
 
 	<!-- Broad access often needed by TrollStore system utilities. -->
 	<key>com.apple.private.security.disk-device-access</key>
