@@ -52,28 +52,41 @@ static int POCTaskTypeFromBuffer(const char *buffer)
     return (buffer[0] - '0') * 10 + (buffer[1] - '0');
 }
 
-// Handle one complete line (without trailing newline). Returns nil (no response)
-// for fire-and-forget task 10; otherwise returns a short status line.
+// Handle one complete line (without trailing newline). Returns nil for legacy
+// fire-and-forget task 10; otherwise returns a short status line.
 static NSData *POCHandleLine(const char *line)
 {
     if (!line) return nil;
     int taskType = POCTaskTypeFromBuffer(line);
+    POCLogf("socket: line='%s' task=%d", line, taskType);
+
     if (taskType == 10) {
-        // Skip the leading "10"; the rest is the touch payload body.
-        // Run the IOHID dispatch path on the main thread to match the in-app
-        // self-test path. Some private HID client paths are runloop/thread
-        // sensitive, and the POC goal is to compare socket vs UI with only the
-        // transport differing.
-        NSString *bodyString = [NSString stringWithUTF8String:(line + 2)];
+        // Accept both legacy forms:
+        //   10 + body
+        //   10;; + body
+        const char *body = line + 2;
+        if (body[0] == ';' && body[1] == ';') body += 2;
+
+        NSString *bodyString = [NSString stringWithUTF8String:body];
         if (!bodyString) bodyString = @"";
-        POCLogf("socket: task10 received body='%s' len=%lu", line + 2, (unsigned long)strlen(line + 2));
+        POCLogf("socket: task10 received body='%s' len=%lu", body, (unsigned long)strlen(body));
+
         dispatch_async(dispatch_get_main_queue(), ^{
-            POCLogf("socket: task10 dispatching on main thread body='%s'", [bodyString UTF8String]);
-            POCPerformTouchFromRawData((const unsigned char *)[bodyString UTF8String]);
+            const char *mainBody = [bodyString UTF8String];
+            POCLogf("socket: task10 dispatching on main thread body='%s'", mainBody);
+            POCPerformTouchFromRawData((const unsigned char *)mainBody);
         });
-        return nil; // fire-and-forget
+        return nil; // keep legacy touch fire-and-forget
     }
+
+    if (taskType == 99) {
+        const char *resp = "0;;poc_alive\r\n";
+        POCLogf("socket: task99 ping -> poc_alive");
+        return [NSData dataWithBytes:resp length:strlen(resp)];
+    }
+
     // POC scope: only touch is implemented.
+    POCLogf("socket: unsupported task %d line='%s'", taskType, line);
     const char *resp = "1;;poc_only_supports_task_10\r\n";
     return [NSData dataWithBytes:resp length:strlen(resp)];
 }
@@ -169,6 +182,8 @@ static void POCReadStreamCallback(CFReadStreamRef readStream, CFStreamEventType 
             if (hasRead > 0) {
                 POCClientContext *ctx = [sClients objectForKey:@((long)readStream)];
                 if (!ctx) return;
+                NSString *chunk = [[NSString alloc] initWithBytes:buff length:(NSUInteger)hasRead encoding:NSUTF8StringEncoding];
+                POCLogf("socket: read %ld bytes chunk='%s'", (long)hasRead, chunk ? [chunk UTF8String] : "<non-utf8>");
                 [ctx.buffer appendBytes:buff length:(NSUInteger)hasRead];
                 POCProcessBuffer(ctx);
             } else {
@@ -184,6 +199,7 @@ static void POCAcceptCallback(CFSocketRef socket, CFSocketCallBackType type, CFD
     if (type != kCFSocketAcceptCallBack) return;
 
     CFSocketNativeHandle handle = *(CFSocketNativeHandle *)data;
+    POCLogf("socket: accepted client fd=%d", handle);
     int one = 1;
     setsockopt(handle, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
 
