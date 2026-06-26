@@ -37,9 +37,9 @@ void POCSelfTestTapAtPoint(double xPoint, double yPoint);
 
 // Diagnostics for the UI/log.
 unsigned long long POCTouchCurrentSenderID(void);
-int POCTouchDispatchVariant(void); // 0 = A (Create), 1 = B (CreateWithType)
+int POCTouchDispatchVariant(void); // 0=A Create, 1=B Admin, 2=C Monitor, 3=D Passive
 
-// Switch the dispatch variant at runtime (0 = A, 1 = B).
+// Switch the dispatch variant at runtime.
 void POCSetDispatchVariant(int variant);
 
 #ifdef __cplusplus

@@ -60,8 +60,17 @@ static NSData *POCHandleLine(const char *line)
     int taskType = POCTaskTypeFromBuffer(line);
     if (taskType == 10) {
         // Skip the leading "10"; the rest is the touch payload body.
-        const unsigned char *body = (const unsigned char *)(line + 2);
-        POCPerformTouchFromRawData(body);
+        // Run the IOHID dispatch path on the main thread to match the in-app
+        // self-test path. Some private HID client paths are runloop/thread
+        // sensitive, and the POC goal is to compare socket vs UI with only the
+        // transport differing.
+        NSString *bodyString = [NSString stringWithUTF8String:(line + 2)];
+        if (!bodyString) bodyString = @"";
+        POCLogf("socket: task10 received body='%s' len=%lu", line + 2, (unsigned long)strlen(line + 2));
+        dispatch_async(dispatch_get_main_queue(), ^{
+            POCLogf("socket: task10 dispatching on main thread body='%s'", [bodyString UTF8String]);
+            POCPerformTouchFromRawData((const unsigned char *)[bodyString UTF8String]);
+        });
         return nil; // fire-and-forget
     }
     // POC scope: only touch is implemented.

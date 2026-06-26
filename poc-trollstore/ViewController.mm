@@ -48,7 +48,7 @@
     self.senderLabel.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:self.senderLabel];
 
-    self.variantControl = [[UISegmentedControl alloc] initWithItems:@[@"Variant A", @"Variant B"]];
+    self.variantControl = [[UISegmentedControl alloc] initWithItems:@[@"A Create", @"B Admin", @"C Monitor", @"D Passive"]];
     self.variantControl.selectedSegmentIndex = POCTouchDispatchVariant();
     [self.variantControl addTarget:self action:@selector(variantChanged:) forControlEvents:UIControlEventValueChanged];
     self.variantControl.translatesAutoresizingMaskIntoConstraints = NO;
@@ -132,9 +132,11 @@
 - (void)refreshStatus
 {
     int variant = POCTouchDispatchVariant();
+    NSArray *names = @[@"A Create", @"B Admin", @"C Monitor", @"D Passive"];
+    NSString *variantName = (variant >= 0 && variant < (int)names.count) ? names[(NSUInteger)variant] : @"Unknown";
     self.statusLabel.text = [NSString stringWithFormat:
         @"Dispatch variant: %@\nSocket: TCP 6000 (task 10 -> in-process touch)",
-        variant == 0 ? @"A (Create)" : @"B (CreateWithType)"];
+        variantName];
 
     unsigned long long sid = POCTouchCurrentSenderID();
     self.senderLabel.text = [NSString stringWithFormat:

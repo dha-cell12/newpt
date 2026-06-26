@@ -13,14 +13,16 @@
 // This is a trimmed-down standalone version of the original pccontrol Touch.xm,
 // adapted to run inside a normal TrollStore app process (NOT inside SpringBoard).
 //
-// Two dispatch variants are compiled in and selectable at runtime so we can
-// quickly determine which one (if any) actually injects touches on iOS 15-16:
+// Multiple dispatch variants are compiled in and selectable at runtime so we
+// can determine which IOHID client type, if any, can inject touches on iOS 15-16:
 //
-//   Variant A: IOHIDEventSystemClientCreate           (the legacy path)
-//   Variant B: IOHIDEventSystemClientCreateWithType   (monitor/passive client)
+//   Variant A: IOHIDEventSystemClientCreate
+//   Variant B: IOHIDEventSystemClientCreateWithType(Admin=0)
+//   Variant C: IOHIDEventSystemClientCreateWithType(Monitor=1)
+//   Variant D: IOHIDEventSystemClientCreateWithType(Passive=2)
 //
-// Set the variant via the env var POC_DISPATCH_VARIANT (0=A, 1=B) or the
-// in-app toggle. Default is A.
+// Set the variant via the env var POC_DISPATCH_VARIANT (0..3) or the in-app
+// toggle. Default is A.
 // ---------------------------------------------------------------------------
 
 #define MAX_FINGER_INDEX 20
@@ -44,15 +46,15 @@ extern "C" {
                                                                    CFDictionaryRef attributes);
 }
 
-#ifndef POC_HID_CLIENT_TYPE_PASSIVE
+#define POC_HID_CLIENT_TYPE_ADMIN   0
+#define POC_HID_CLIENT_TYPE_MONITOR 1
 #define POC_HID_CLIENT_TYPE_PASSIVE 2
-#endif
 
 static CGFloat sScreenWidth = 0;
 static CGFloat sScreenHeight = 0;
 
 static unsigned long long sSenderID = 0x0;
-static int sDispatchVariant = 0; // 0 = A, 1 = B
+static int sDispatchVariant = 0; // 0=A Create, 1=B Admin, 2=C Monitor, 3=D Passive
 
 static IOHIDEventSystemClientRef sSenderIDClient = NULL;
 
@@ -226,29 +228,48 @@ static void POCAppendChild(IOHIDEventRef parent, int type, int index, float x, f
 // ---------------------------------------------------------------------------
 // Dispatch (the go/no-go core)
 // ---------------------------------------------------------------------------
+static const char *POCDispatchVariantName(int variant)
+{
+    switch (variant) {
+        case 0: return "A Create";
+        case 1: return "B CreateWithType(Admin=0)";
+        case 2: return "C CreateWithType(Monitor=1)";
+        case 3: return "D CreateWithType(Passive=2)";
+        default: return "Unknown";
+    }
+}
+
 static IOHIDEventSystemClientRef POCDispatchClient(void)
 {
-    static IOHIDEventSystemClientRef clientA = NULL;
-    static IOHIDEventSystemClientRef clientB = NULL;
+    static IOHIDEventSystemClientRef clients[4] = { NULL, NULL, NULL, NULL };
+    int variant = sDispatchVariant;
+    if (variant < 0 || variant > 3) variant = 0;
 
-    if (sDispatchVariant == 1) {
-        if (!clientB) {
-            clientB = IOHIDEventSystemClientCreateWithType(kCFAllocatorDefault, POC_HID_CLIENT_TYPE_PASSIVE, NULL);
-            POCLogf("variant B: CreateWithType(passive) -> %p", (void *)clientB);
-            if (!clientB) {
-                // Fall back to variant A client if B can't even be created.
-                clientB = IOHIDEventSystemClientCreate(kCFAllocatorDefault);
-                POCLogf("variant B fallback: Create -> %p", (void *)clientB);
-            }
-        }
-        return clientB;
+    if (clients[variant]) return clients[variant];
+
+    switch (variant) {
+        case 0:
+            clients[variant] = IOHIDEventSystemClientCreate(kCFAllocatorDefault);
+            break;
+        case 1:
+            clients[variant] = IOHIDEventSystemClientCreateWithType(kCFAllocatorDefault,
+                                                                     POC_HID_CLIENT_TYPE_ADMIN,
+                                                                     NULL);
+            break;
+        case 2:
+            clients[variant] = IOHIDEventSystemClientCreateWithType(kCFAllocatorDefault,
+                                                                     POC_HID_CLIENT_TYPE_MONITOR,
+                                                                     NULL);
+            break;
+        case 3:
+            clients[variant] = IOHIDEventSystemClientCreateWithType(kCFAllocatorDefault,
+                                                                     POC_HID_CLIENT_TYPE_PASSIVE,
+                                                                     NULL);
+            break;
     }
 
-    if (!clientA) {
-        clientA = IOHIDEventSystemClientCreate(kCFAllocatorDefault);
-        POCLogf("variant A: Create -> %p", (void *)clientA);
-    }
-    return clientA;
+    POCLogf("variant %d (%s): client -> %p", variant, POCDispatchVariantName(variant), (void *)clients[variant]);
+    return clients[variant];
 }
 
 static void POCPostEvent(IOHIDEventRef event)
@@ -370,8 +391,8 @@ static void POCReadScreenSize(void)
 void POCTouchInit(void)
 {
     const char *envVariant = getenv("POC_DISPATCH_VARIANT");
-    if (envVariant && (envVariant[0] == '1')) {
-        sDispatchVariant = 1;
+    if (envVariant && envVariant[0] >= '0' && envVariant[0] <= '3') {
+        sDispatchVariant = envVariant[0] - '0';
     }
     POCReadScreenSize();
     POCInitSenderID();
@@ -380,8 +401,9 @@ void POCTouchInit(void)
 
 void POCSetDispatchVariant(int variant)
 {
-    sDispatchVariant = (variant == 1) ? 1 : 0;
-    POCLogf("dispatch variant set to %d", sDispatchVariant);
+    if (variant < 0 || variant > 3) variant = 0;
+    sDispatchVariant = variant;
+    POCLogf("dispatch variant set to %d (%s)", sDispatchVariant, POCDispatchVariantName(sDispatchVariant));
 }
 
 void POCSelfTestTapAtPoint(double xPoint, double yPoint)
