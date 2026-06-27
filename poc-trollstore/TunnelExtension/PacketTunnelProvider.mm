@@ -163,14 +163,15 @@ static void TPExtensionImageLoaded(void)
         }
 
         TPLog(@"tunnel settings applied; provider is alive");
-        TPLoadRuntimeState();
-        __strong __typeof(weakSelf) s = weakSelf;
-        if (s && !s.tcpServer) {
-            s.tcpServer = [[ProviderTCPServer alloc] initWithPort:POC_PROVIDER_TCP_PORT];
-            int berr = 0;
-            BOOL ok = [s.tcpServer startWithErrno:&berr];
-            TPLog(@"tcpServer start ok=%d port=%u errno=%d", ok ? 1 : 0, (unsigned)POC_PROVIDER_TCP_PORT, berr);
-        }
+        // ROLLBACK: TPLoadRuntimeState + ProviderTCPServer disabled to isolate regression source.
+        // TPLoadRuntimeState();
+        // __strong __typeof(weakSelf) s = weakSelf;
+        // if (s && !s.tcpServer) {
+        //     s.tcpServer = [[ProviderTCPServer alloc] initWithPort:POC_PROVIDER_TCP_PORT];
+        //     int berr = 0;
+        //     BOOL ok = [s.tcpServer startWithErrno:&berr];
+        //     TPLog(@"tcpServer start ok=%d port=%u errno=%d", ok ? 1 : 0, (unsigned)POC_PROVIDER_TCP_PORT, berr);
+        // }
         dispatch_async(dispatch_get_main_queue(), ^{
             __strong __typeof(weakSelf) strongSelf = weakSelf;
             if (!strongSelf) return;
