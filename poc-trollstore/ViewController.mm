@@ -91,6 +91,33 @@
     stopTunnelButton.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:stopTunnelButton];
 
+    UIButton *statusButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [statusButton setTitle:@"Status" forState:UIControlStateNormal];
+    statusButton.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
+    [statusButton addTarget:self action:@selector(statusPressed:) forControlEvents:UIControlEventTouchUpInside];
+    statusButton.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.view addSubview:statusButton];
+
+    UIButton *readLogButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [readLogButton setTitle:@"Read Log" forState:UIControlStateNormal];
+    readLogButton.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
+    [readLogButton addTarget:self action:@selector(readLogPressed:) forControlEvents:UIControlEventTouchUpInside];
+    readLogButton.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.view addSubview:readLogButton];
+
+    UIButton *filePingButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [filePingButton setTitle:@"File Ping" forState:UIControlStateNormal];
+    filePingButton.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
+    [filePingButton addTarget:self action:@selector(filePingPressed:) forControlEvents:UIControlEventTouchUpInside];
+    filePingButton.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.view addSubview:filePingButton];
+
+    // Stash the diagnostic buttons on ivars via objc_setAssociatedObject is
+    // overkill; just use tags so we can find them in constraints below.
+    statusButton.tag = 5001;
+    readLogButton.tag = 5002;
+    filePingButton.tag = 5003;
+
     self.neLabel = [[UILabel alloc] init];
     self.neLabel.text = @"Tunnel: not tested";
     self.neLabel.numberOfLines = 0;
@@ -147,7 +174,16 @@
         [stopTunnelButton.centerYAnchor constraintEqualToAnchor:startTunnelButton.centerYAnchor],
         [stopTunnelButton.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor constant:110],
 
-        [self.neLabel.topAnchor constraintEqualToAnchor:startTunnelButton.bottomAnchor constant:4],
+        [[self.view viewWithTag:5001].topAnchor constraintEqualToAnchor:startTunnelButton.bottomAnchor constant:8],
+        [[self.view viewWithTag:5001].centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor constant:-110],
+
+        [[self.view viewWithTag:5002].centerYAnchor constraintEqualToAnchor:[self.view viewWithTag:5001].centerYAnchor],
+        [[self.view viewWithTag:5002].centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+
+        [[self.view viewWithTag:5003].centerYAnchor constraintEqualToAnchor:[self.view viewWithTag:5001].centerYAnchor],
+        [[self.view viewWithTag:5003].centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor constant:110],
+
+        [self.neLabel.topAnchor constraintEqualToAnchor:[self.view viewWithTag:5001].bottomAnchor constant:4],
         [self.neLabel.leadingAnchor constraintEqualToAnchor:g.leadingAnchor constant:16],
         [self.neLabel.trailingAnchor constraintEqualToAnchor:g.trailingAnchor constant:-16],
 
