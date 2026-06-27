@@ -1,6 +1,9 @@
 #import <Foundation/Foundation.h>
 #import <NetworkExtension/NetworkExtension.h>
 #import <sys/stat.h>
+#include <inttypes.h>
+
+#include "../HIDInjectCore.h"
 
 static NSString *TPSharedDir(void)
 {
@@ -207,11 +210,46 @@ static void TPExtensionImageLoaded(void)
     self.lastCommand = command;
     TPLog(@"fileCommand '%@'", command);
 
+    NSString *trimmed = [command stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     NSString *response = nil;
-    if ([command hasPrefix:@"ping:"]) {
+    if ([trimmed hasPrefix:@"ping:"]) {
         response = [NSString stringWithFormat:@"pong:%@", [NSDate date]];
+    } else if ([trimmed hasPrefix:@"set_variant:"]) {
+        NSString *arg = [trimmed substringFromIndex:[@"set_variant:" length]];
+        int v = [arg intValue];
+        HIDInjectCoreSetVariant(v);
+        response = [NSString stringWithFormat:@"variant_set:%d", HIDInjectCoreVariant()];
+    } else if ([trimmed hasPrefix:@"set_sender_id:"]) {
+        NSString *arg = [trimmed substringFromIndex:[@"set_sender_id:" length]];
+        unsigned long long s = 0;
+        NSScanner *scanner = [NSScanner scannerWithString:arg];
+        if (![scanner scanHexLongLong:&s]) {
+            s = (unsigned long long)[arg longLongValue];
+        }
+        HIDInjectCoreSetSenderID(s);
+        response = [NSString stringWithFormat:@"sender_id_set:0x%llx", HIDInjectCoreSenderID()];
+    } else if ([trimmed hasPrefix:@"inject_tap:"]) {
+        NSString *arg = [trimmed substringFromIndex:[@"inject_tap:" length]];
+        NSArray<NSString *> *parts = [arg componentsSeparatedByString:@","];
+        if (parts.count < 4) {
+            response = [NSString stringWithFormat:@"inject_tap_err:bad_args:%@", arg];
+        } else {
+            double x = [parts[0] doubleValue];
+            double y = [parts[1] doubleValue];
+            double w = [parts[2] doubleValue];
+            double h = [parts[3] doubleValue];
+            HIDInjectCoreSetScreenSize(w, h);
+            HIDInjectResult r = HIDInjectDispatchTap(x, y);
+            response = [NSString stringWithFormat:
+                @"inject_tap_ok x=%.1f y=%.1f w=%.0f h=%.0f variant=%d sender=0x%llx clientCreated=%d eventCreated=%d dispatched=%d senderIDUsed=%d errno=%d clientPtr=%p",
+                x, y, w, h,
+                HIDInjectCoreVariant(),
+                r.senderID,
+                r.clientCreated, r.eventCreated, r.dispatched, r.senderIDUsed,
+                r.errnoValue, r.clientPtr];
+        }
     } else {
-        response = [NSString stringWithFormat:@"unknown:%@", command];
+        response = [NSString stringWithFormat:@"unknown:%@", trimmed];
     }
 
     [[NSFileManager defaultManager] createDirectoryAtPath:[responsePath stringByDeletingLastPathComponent]

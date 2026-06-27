@@ -214,6 +214,74 @@ void POCNESendFilePing(void (^completion)(NSString *status))
     });
 }
 
+// Generic file-IPC command sender. Writes `command` to command.txt and polls
+// response.txt for up to `timeout` seconds. Used by the inject_tap /
+// set_sender_id / set_variant helpers below.
+static void POCNESendFileCommand(NSString *command, NSTimeInterval timeout, void (^completion)(NSString *status))
+{
+    NSString *base = POCNESharedDir();
+    NSString *commandPath = POCNESharedPath(@"command.txt");
+    NSString *responsePath = POCNESharedPath(@"response.txt");
+    NSError *error = nil;
+    [[NSFileManager defaultManager] createDirectoryAtPath:base withIntermediateDirectories:YES attributes:nil error:nil];
+    chmod([base fileSystemRepresentation], 0777);
+    [[NSFileManager defaultManager] removeItemAtPath:responsePath error:nil];
+
+    // Append a timestamp so the provider's "isEqualToString:self.lastCommand"
+    // check always sees a new payload, even for back-to-back identical requests.
+    NSString *stamped = [NSString stringWithFormat:@"%@#%@", command, [NSDate date]];
+    BOOL ok = [stamped writeToFile:commandPath atomically:NO encoding:NSUTF8StringEncoding error:&error];
+    chmod([commandPath fileSystemRepresentation], 0666);
+    if (!ok || error) {
+        POCNEComplete(completion, [NSString stringWithFormat:@"command write failed: %@", error]);
+        return;
+    }
+
+    // Poll for response. Lightweight: 200 ms intervals up to `timeout`.
+    __block NSTimeInterval elapsed = 0;
+    const NSTimeInterval step = 0.2;
+    dispatch_queue_t q = dispatch_get_main_queue();
+    __block void (^tick)(void);
+    tick = ^{
+        NSError *rerr = nil;
+        NSString *resp = [NSString stringWithContentsOfFile:responsePath encoding:NSUTF8StringEncoding error:&rerr];
+        if (resp.length > 0) {
+            POCNEComplete(completion, resp);
+            tick = nil;
+            return;
+        }
+        elapsed += step;
+        if (elapsed >= timeout) {
+            NSString *pollPath = POCNESharedPath(@"poll_state.txt");
+            NSString *poll = [NSString stringWithContentsOfFile:pollPath encoding:NSUTF8StringEncoding error:nil] ?: @"<nil>";
+            POCNEComplete(completion, [NSString stringWithFormat:@"timeout %.1fs waiting for response. last err=%@. poll_state=%@",
+                                       timeout, rerr, poll]);
+            tick = nil;
+            return;
+        }
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(step * NSEC_PER_SEC)), q, tick);
+    };
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(step * NSEC_PER_SEC)), q, tick);
+}
+
+void POCNESendInjectTap(double xPx, double yPx, double wPx, double hPx, void (^completion)(NSString *status))
+{
+    NSString *cmd = [NSString stringWithFormat:@"inject_tap:%.1f,%.1f,%.0f,%.0f", xPx, yPx, wPx, hPx];
+    POCNESendFileCommand(cmd, 3.0, completion);
+}
+
+void POCNESendSetSenderID(unsigned long long senderID, void (^completion)(NSString *status))
+{
+    NSString *cmd = [NSString stringWithFormat:@"set_sender_id:%llx", senderID];
+    POCNESendFileCommand(cmd, 2.0, completion);
+}
+
+void POCNESendSetVariant(int variant, void (^completion)(NSString *status))
+{
+    NSString *cmd = [NSString stringWithFormat:@"set_variant:%d", variant];
+    POCNESendFileCommand(cmd, 2.0, completion);
+}
+
 void POCNESendPing(void (^completion)(NSString *status))
 {
     POCNELoadManager(^(NETunnelProviderManager *manager, NSError *error) {

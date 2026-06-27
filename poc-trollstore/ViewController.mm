@@ -50,7 +50,7 @@
     self.senderLabel.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:self.senderLabel];
 
-    self.variantControl = [[UISegmentedControl alloc] initWithItems:@[@"A Create", @"B Admin", @"C Monitor", @"D Passive"]];
+    self.variantControl = [[UISegmentedControl alloc] initWithItems:@[@"A Create", @"B Passive", @"C Monitor", @"D Passive"]];
     self.variantControl.selectedSegmentIndex = POCTouchDispatchVariant();
     [self.variantControl addTarget:self action:@selector(variantChanged:) forControlEvents:UIControlEventValueChanged];
     self.variantControl.translatesAutoresizingMaskIntoConstraints = NO;
@@ -118,6 +118,30 @@
     readLogButton.tag = 5002;
     filePingButton.tag = 5003;
 
+    UIButton *injectViaProviderButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [injectViaProviderButton setTitle:@"Inj Tap PR" forState:UIControlStateNormal];
+    injectViaProviderButton.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
+    [injectViaProviderButton addTarget:self action:@selector(injectViaProviderPressed:) forControlEvents:UIControlEventTouchUpInside];
+    injectViaProviderButton.translatesAutoresizingMaskIntoConstraints = NO;
+    injectViaProviderButton.tag = 5004;
+    [self.view addSubview:injectViaProviderButton];
+
+    UIButton *syncIDButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [syncIDButton setTitle:@"Sync ID" forState:UIControlStateNormal];
+    syncIDButton.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
+    [syncIDButton addTarget:self action:@selector(syncSenderIDPressed:) forControlEvents:UIControlEventTouchUpInside];
+    syncIDButton.translatesAutoresizingMaskIntoConstraints = NO;
+    syncIDButton.tag = 5005;
+    [self.view addSubview:syncIDButton];
+
+    UIButton *syncVariantButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [syncVariantButton setTitle:@"Sync Var" forState:UIControlStateNormal];
+    syncVariantButton.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
+    [syncVariantButton addTarget:self action:@selector(syncVariantPressed:) forControlEvents:UIControlEventTouchUpInside];
+    syncVariantButton.translatesAutoresizingMaskIntoConstraints = NO;
+    syncVariantButton.tag = 5006;
+    [self.view addSubview:syncVariantButton];
+
     self.neLabel = [[UILabel alloc] init];
     self.neLabel.text = @"Tunnel: not tested";
     self.neLabel.numberOfLines = 0;
@@ -183,7 +207,16 @@
         [[self.view viewWithTag:5003].centerYAnchor constraintEqualToAnchor:[self.view viewWithTag:5001].centerYAnchor],
         [[self.view viewWithTag:5003].centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor constant:110],
 
-        [self.neLabel.topAnchor constraintEqualToAnchor:[self.view viewWithTag:5001].bottomAnchor constant:4],
+        [[self.view viewWithTag:5004].topAnchor constraintEqualToAnchor:[self.view viewWithTag:5001].bottomAnchor constant:8],
+        [[self.view viewWithTag:5004].centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor constant:-110],
+
+        [[self.view viewWithTag:5005].centerYAnchor constraintEqualToAnchor:[self.view viewWithTag:5004].centerYAnchor],
+        [[self.view viewWithTag:5005].centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+
+        [[self.view viewWithTag:5006].centerYAnchor constraintEqualToAnchor:[self.view viewWithTag:5004].centerYAnchor],
+        [[self.view viewWithTag:5006].centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor constant:110],
+
+        [self.neLabel.topAnchor constraintEqualToAnchor:[self.view viewWithTag:5004].bottomAnchor constant:4],
         [self.neLabel.leadingAnchor constraintEqualToAnchor:g.leadingAnchor constant:16],
         [self.neLabel.trailingAnchor constraintEqualToAnchor:g.trailingAnchor constant:-16],
 
@@ -218,7 +251,7 @@
 - (void)refreshStatus
 {
     int variant = POCTouchDispatchVariant();
-    NSArray *names = @[@"A Create", @"B Admin", @"C Monitor", @"D Passive"];
+    NSArray *names = @[@"A Create", @"B Passive", @"C Monitor", @"D Passive"];
     NSString *variantName = (variant >= 0 && variant < (int)names.count) ? names[(NSUInteger)variant] : @"Unknown";
     self.statusLabel.text = [NSString stringWithFormat:
         @"Dispatch variant: %@\nSocket: TCP 6000 (task 10 -> in-process touch)",
