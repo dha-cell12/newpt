@@ -163,15 +163,19 @@ static void TPExtensionImageLoaded(void)
         }
 
         TPLog(@"tunnel settings applied; provider is alive");
-        // ROLLBACK: TPLoadRuntimeState + ProviderTCPServer disabled to isolate regression source.
-        // TPLoadRuntimeState();
-        // __strong __typeof(weakSelf) s = weakSelf;
-        // if (s && !s.tcpServer) {
-        //     s.tcpServer = [[ProviderTCPServer alloc] initWithPort:POC_PROVIDER_TCP_PORT];
-        //     int berr = 0;
-        //     BOOL ok = [s.tcpServer startWithErrno:&berr];
-        //     TPLog(@"tcpServer start ok=%d port=%u errno=%d", ok ? 1 : 0, (unsigned)POC_PROVIDER_TCP_PORT, berr);
-        // }
+        // Start TCP server async on a background queue so it cannot block the
+        // provider thread or interfere with the file-IPC heartbeat timer.
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_BACKGROUND, 0), ^{
+            __strong __typeof(weakSelf) s = weakSelf;
+            if (!s || s.tcpServer) return;
+            ProviderTCPServer *srv = [[ProviderTCPServer alloc] initWithPort:POC_PROVIDER_TCP_PORT];
+            int berr = 0;
+            BOOL ok = [srv startWithErrno:&berr];
+            TPLog(@"tcpServer start (async) ok=%d port=%u errno=%d", ok ? 1 : 0, (unsigned)POC_PROVIDER_TCP_PORT, berr);
+            if (ok) {
+                dispatch_async(dispatch_get_main_queue(), ^{ s.tcpServer = srv; });
+            }
+        });
         dispatch_async(dispatch_get_main_queue(), ^{
             __strong __typeof(weakSelf) strongSelf = weakSelf;
             if (!strongSelf) return;
