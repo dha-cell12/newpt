@@ -143,7 +143,7 @@ static NSString *POCNESharedDir(void)
             // block writes here, but at least the host can still read.
             cached = @"/var/mobile/Library/TouchPOCShared";
         }
-        POCLogf("NE: shared dir resolved to %s", cached.UTF8String);
+        NSLog(@"[NEManager] shared dir resolved to %@", cached);
         [[NSFileManager defaultManager] createDirectoryAtPath:cached
                                   withIntermediateDirectories:YES
                                                    attributes:nil
