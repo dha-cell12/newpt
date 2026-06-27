@@ -22,16 +22,19 @@ static void TPLoadRuntimeState(void)
     NSDictionary *dict = [NSDictionary dictionaryWithContentsOfFile:path];
     double w = 1242.0, h = 2208.0;
     unsigned long long sid = 0;
-    int variant = 0;
+    int variant = 1;
     if (dict) {
         double dw = [dict[@"width"]  doubleValue];
         double dh = [dict[@"height"] doubleValue];
         if (dw > 0) w = dw;
         if (dh > 0) h = dh;
         sid = (unsigned long long)[dict[@"senderID"] unsignedLongLongValue];
-        variant = [dict[@"variant"] intValue];
+        if (dict[@"variant"] != nil) {
+            int v = [dict[@"variant"] intValue];
+            if (v >= 1 && v <= 3) variant = v;
+        }
     }
-    HIDInjectCoreSetScreenSize(w, h);
+    if (w > 0 && h > 0) HIDInjectCoreSetScreenSize(w, h);
     HIDInjectCoreSetVariant(variant);
     if (sid != 0) HIDInjectCoreSetSenderID(sid);
     NSLog(@"[TP] runtime state loaded dict=%d w=%.0f h=%.0f sid=0x%llx var=%d path=%@",
