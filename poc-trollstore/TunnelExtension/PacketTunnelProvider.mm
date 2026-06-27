@@ -7,7 +7,25 @@ static NSString *TPSharedDir(void)
     // Use a fixed shared path for this TrollStore/no-container POC. App Group
     // containers can resolve differently or be unavailable across the main app
     // and the manually packaged provider extension.
-    return @"/var/mobile/Library/TouchPOCShared";
+    static NSString *cached = nil;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        NSURL *url = [[NSFileManager defaultManager]
+            containerURLForSecurityApplicationGroupIdentifier:@"group.com.poc.trollstore.touch"];
+        if (url) {
+            cached = [[url path] copy];
+        } else {
+            cached = @"/var/mobile/Library/TouchPOCShared";
+        }
+        [[NSFileManager defaultManager] createDirectoryAtPath:cached
+                                  withIntermediateDirectories:YES
+                                                   attributes:nil
+                                                        error:nil];
+        NSString *marker = [cached stringByAppendingPathComponent:@"provider_boot.txt"];
+        NSString *line = [NSString stringWithFormat:@"provider resolved shared dir at %@ pid=%d\n", cached, getpid()];
+        [line writeToFile:marker atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    });
+    return cached;
 }
 
 static NSString *TPGroupPath(NSString *name)

@@ -131,7 +131,25 @@ void POCNEStatus(void (^completion)(NSString *status))
 
 static NSString *POCNESharedDir(void)
 {
-    return @"/var/mobile/Library/TouchPOCShared";
+    static NSString *cached = nil;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        NSURL *url = [[NSFileManager defaultManager]
+            containerURLForSecurityApplicationGroupIdentifier:@"group.com.poc.trollstore.touch"];
+        if (url) {
+            cached = [[url path] copy];
+        } else {
+            // Fallback: legacy hardcoded path. Extension sandbox will likely
+            // block writes here, but at least the host can still read.
+            cached = @"/var/mobile/Library/TouchPOCShared";
+        }
+        POCLogf("NE: shared dir resolved to %s", cached.UTF8String);
+        [[NSFileManager defaultManager] createDirectoryAtPath:cached
+                                  withIntermediateDirectories:YES
+                                                   attributes:nil
+                                                        error:nil];
+    });
+    return cached;
 }
 
 static NSString *POCNESharedPath(NSString *name)
