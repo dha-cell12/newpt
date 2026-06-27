@@ -284,11 +284,22 @@
     [self performCenterTap];
 }
 
+- (CGPoint)targetCenterInWindow
+{
+    // Force a layout pass so targetButton.frame is up to date even on first tap.
+    [self.view layoutIfNeeded];
+    CGRect targetFrame = self.targetButton.frame;
+    CGPoint center = CGPointMake(CGRectGetMidX(targetFrame), CGRectGetMidY(targetFrame));
+    // Convert from targetButton's superview (self.view) to window coordinates,
+    // because HID events are dispatched in screen coordinates.
+    return [self.view convertPoint:center toView:nil];
+}
+
 - (void)performCenterTap
 {
-    CGPoint center = CGPointMake(CGRectGetMidX(self.view.bounds), CGRectGetMidY(self.view.bounds));
-    POCLogf("UI: performing center tap at (%.0f, %.0f) pt", center.x, center.y);
-    POCSelfTestTapAtPoint(center.x, center.y);
+    CGPoint p = [self targetCenterInWindow];
+    POCLogf("UI: tapping TARGET at window (%.0f, %.0f) pt", p.x, p.y);
+    POCSelfTestTapAtPoint(p.x, p.y);
 }
 
 - (void)setTunnelStatus:(NSString *)status prefix:(NSString *)prefix
@@ -380,12 +391,12 @@
     CGFloat hPt = [UIScreen mainScreen].bounds.size.height;
     CGFloat wPx = wPt * scale;
     CGFloat hPx = hPt * scale;
-    CGPoint centerPt = CGPointMake(CGRectGetMidX(self.view.bounds), CGRectGetMidY(self.view.bounds));
-    CGFloat xPx = centerPt.x * scale;
-    CGFloat yPx = centerPt.y * scale;
-    NSString *msg = [NSString stringWithFormat:@"NE: inject_tap x=%.0f y=%.0f w=%.0f h=%.0f", xPx, yPx, wPx, hPx];
+    CGPoint targetPt = [self targetCenterInWindow];
+    CGFloat xPx = targetPt.x * scale;
+    CGFloat yPx = targetPt.y * scale;
+    NSString *msg = [NSString stringWithFormat:@"NE: inject_tap x=%.0f y=%.0f w=%.0f h=%.0f (target pt %.0f,%.0f)", xPx, yPx, wPx, hPx, targetPt.x, targetPt.y];
     self.neLabel.text = msg;
-    POCLogf("UI: provider inject_tap x=%.0f y=%.0f w=%.0f h=%.0f", xPx, yPx, wPx, hPx);
+    POCLogf("UI: provider inject_tap x=%.0f y=%.0f w=%.0f h=%.0f (target pt=%.0f,%.0f)", xPx, yPx, wPx, hPx, targetPt.x, targetPt.y);
     POCNESendInjectTap(xPx, yPx, wPx, hPx, ^(NSString *status) {
         [self setTunnelStatus:status prefix:@"InjectTap"];
     });
