@@ -9,7 +9,7 @@ include $(THEOS)/makefiles/common.mk
 # launchable executable inside the .appex wrapper.
 TOOL_NAME = TouchPOCTunnel
 
-TouchPOCTunnel_FILES = ExtensionMain.mm PacketTunnelProvider.mm ../HIDInjectCore.mm
+TouchPOCTunnel_FILES = ExtensionMain.mm PacketTunnelProvider.mm ProviderTCPServer.mm ../HIDInjectCore.mm ../WireProtocolParser.mm
 TouchPOCTunnel_FRAMEWORKS = Foundation NetworkExtension CoreGraphics
 TouchPOCTunnel_PRIVATE_FRAMEWORKS = IOKit
 TouchPOCTunnel_CFLAGS = -fobjc-arc -Wno-error -I..
