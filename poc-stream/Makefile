@@ -12,7 +12,7 @@ APPLICATION_NAME = StreamPOC
 
 StreamPOC_FILES = main.mm AppDelegate.mm ViewController.mm CaptureCore.mm
 StreamPOC_RESOURCE_FILES = Info.plist
-StreamPOC_FRAMEWORKS = UIKit CoreFoundation CoreGraphics QuartzCore IOSurface
+StreamPOC_FRAMEWORKS = UIKit CoreFoundation CoreGraphics QuartzCore IOSurface Security
 StreamPOC_CFLAGS = -fobjc-arc -Wno-error -Wno-module-import-in-extern-c -Wno-deprecated-declarations
 StreamPOC_CCFLAGS = -std=c++14
 StreamPOC_CODESIGN_FLAGS = -Sentitlements.plist

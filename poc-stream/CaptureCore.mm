@@ -2,6 +2,7 @@
 
 #import <UIKit/UIKit.h>
 #import <CoreFoundation/CoreFoundation.h>
+#import <Security/Security.h>
 #import <errno.h>
 
 typedef struct __IOSurface *IOSurfaceRef;
@@ -36,6 +37,42 @@ static int roundUp(int value, int multiple) {
     return value + multiple - remainder;
 }
 
+static void appendEntitlementValue(NSMutableString *log, NSString *key) {
+    SecTaskRef task = SecTaskCreateFromSelf(kCFAllocatorDefault);
+    if (!task) {
+        [log appendFormat:@"entitlement %@ = <SecTaskCreateFromSelf failed>\n", key];
+        return;
+    }
+    CFErrorRef error = NULL;
+    CFTypeRef value = SecTaskCopyValueForEntitlement(task, (__bridge CFStringRef)key, &error);
+    if (value) {
+        [log appendFormat:@"entitlement %@ = %@\n", key, (__bridge id)value];
+        CFRelease(value);
+    } else {
+        [log appendFormat:@"entitlement %@ = <nil>", key];
+        if (error) {
+            [log appendFormat:@" error=%@", (__bridge id)error];
+            CFRelease(error);
+        }
+        [log appendString:@"\n"];
+    }
+    CFRelease(task);
+}
+
+static void appendCaptureEntitlementSnapshot(NSMutableString *log) {
+    [log appendString:@"-- entitlement snapshot --\n"];
+    appendEntitlementValue(log, @"platform-application");
+    appendEntitlementValue(log, @"com.apple.private.security.no-container");
+    appendEntitlementValue(log, @"com.apple.private.security.no-sandbox");
+    appendEntitlementValue(log, @"com.apple.QuartzCore.global-capture");
+    appendEntitlementValue(log, @"com.apple.QuartzCore.secure-capture");
+    appendEntitlementValue(log, @"com.apple.QuartzCore.secure-mode");
+    appendEntitlementValue(log, @"com.apple.private.IOSurface.protected-access");
+    appendEntitlementValue(log, @"com.apple.security.exception.iokit-user-client-class");
+    appendEntitlementValue(log, @"com.apple.security.iokit-user-client-class");
+    [log appendString:@"-- end entitlement snapshot --\n"];
+}
+
 @implementation CaptureOutcome
 @end
 
@@ -44,6 +81,7 @@ static int roundUp(int value, int multiple) {
 + (CaptureOutcome *)runCaptureProbe {
     CaptureOutcome *outcome = [[CaptureOutcome alloc] init];
     NSMutableString *log = [NSMutableString string];
+    appendCaptureEntitlementSnapshot(log);
 
     // 1. Screen size in pixels (portrait-normalized like Screen.xm).
     CGFloat scale = [[UIScreen mainScreen] scale];
@@ -60,24 +98,35 @@ static int roundUp(int value, int multiple) {
         return outcome;
     }
 
-    // 2. Build IOSurface properties (BGRA, global). Matches Screen.xm:164-177.
+    // 2. Build IOSurface properties (BGRA). First try global like Screen.xm.
+    // If that fails, retry non-global so the diagnostic can distinguish
+    // "global IOSurface blocked" from "IOSurface creation blocked completely".
     int bytesPerElement = 4;
     int bytesPerRow = roundUp(bytesPerElement * width, 32);
-    NSDictionary *properties = @{
+    NSMutableDictionary *properties = [@{
         @"IOSurfaceAllocSize": @(bytesPerRow * height),
         @"IOSurfaceBytesPerElement": @(bytesPerElement),
         @"IOSurfaceBytesPerRow": @(bytesPerRow),
         @"IOSurfaceWidth": @(width),
         @"IOSurfaceHeight": @(height),
-        @"IOSurfaceIsGlobal": @(1),
         @"IOSurfacePixelFormat": @(1111970369), // 'BGRA'
-    };
+    } mutableCopy];
 
+    errno = 0;
+    properties[@"IOSurfaceIsGlobal"] = @(1);
     IOSurfaceRef surface = IOSurfaceCreate((__bridge CFDictionaryRef)properties);
-    [log appendFormat:@"IOSurfaceCreate -> %p (errno=%d)\n", (void *)surface, errno];
+    [log appendFormat:@"IOSurfaceCreate(global=1) -> %p (errno=%d)\n", (void *)surface, errno];
+
+    if (!surface) {
+        errno = 0;
+        properties[@"IOSurfaceIsGlobal"] = @(0);
+        surface = IOSurfaceCreate((__bridge CFDictionaryRef)properties);
+        [log appendFormat:@"IOSurfaceCreate(global=0 fallback) -> %p (errno=%d)\n", (void *)surface, errno];
+    }
+
     if (!surface) {
         outcome.result = CaptureResultFail;
-        [log appendString:@"FAIL: IOSurfaceCreate returned NULL (entitlement/sandbox)\n"];
+        [log appendString:@"FAIL: both global and non-global IOSurfaceCreate returned NULL (IOSurface entitlement/sandbox/signing)\n"];
         outcome.diagnostics = log;
         return outcome;
     }

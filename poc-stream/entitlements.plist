@@ -28,5 +28,28 @@
 	<true/>
 	<key>com.apple.private.IOSurface.protected-access</key>
 	<true/>
+
+	<!-- Tier 2: allow opening IOSurface / framebuffer / accelerator user clients.
+	     Added because iOS 15.8.8 returned NULL at IOSurfaceCreate before the
+	     render-server step. -->
+	<key>com.apple.security.exception.iokit-user-client-class</key>
+	<array>
+		<string>IOSurfaceRootUserClient</string>
+		<string>IOSurfaceAcceleratorClient</string>
+		<string>IOMobileFramebufferUserClient</string>
+		<string>IOAccelContext</string>
+		<string>IOAccelDevice</string>
+	</array>
+
+	<!-- Keep the non-exception spelling too; some private entitlement sets use
+	     this form and ldid/TrollStore will simply carry it through. -->
+	<key>com.apple.security.iokit-user-client-class</key>
+	<array>
+		<string>IOSurfaceRootUserClient</string>
+		<string>IOSurfaceAcceleratorClient</string>
+		<string>IOMobileFramebufferUserClient</string>
+		<string>IOAccelContext</string>
+		<string>IOAccelDevice</string>
+	</array>
 </dict>
 </plist>
