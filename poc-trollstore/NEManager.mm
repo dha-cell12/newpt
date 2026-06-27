@@ -57,10 +57,19 @@ void POCNEInstallAndStart(void (^completion)(NSString *status))
         proto.providerBundleIdentifier = kPOCProviderBundleID;
         proto.serverAddress = @"TouchPOC";
         proto.providerConfiguration = @{@"mode": @"control-plane-only", @"createdBy": @"TouchPOC"};
+        proto.disconnectOnSleep = NO;
 
         manager.localizedDescription = kPOCDescription;
         manager.protocolConfiguration = proto;
         manager.enabled = YES;
+
+        // Phase 3: on-demand persistence. Causes iOS to auto-respawn the tunnel
+        // after force-quit of the host app and after device reboot, so the
+        // provider TCP listener (Phase 2, port 6001) stays reachable.
+        NEOnDemandRuleConnect *onDemandRule = [[NEOnDemandRuleConnect alloc] init];
+        onDemandRule.interfaceTypeMatch = NEOnDemandRuleInterfaceTypeAny;
+        manager.onDemandRules = @[onDemandRule];
+        manager.onDemandEnabled = YES;
 
         [manager saveToPreferencesWithCompletionHandler:^(NSError *saveError) {
             if (saveError) {
@@ -96,6 +105,25 @@ void POCNEStop(void (^completion)(NSString *status))
         }
         [manager.connection stopVPNTunnel];
         POCNEComplete(completion, @"tunnel stop requested");
+    });
+}
+
+void POCNEReset(void (^completion)(NSString *status))
+{
+    POCNELoadManager(^(NETunnelProviderManager *manager, NSError *error) {
+        if (error || !manager) {
+            POCNEComplete(completion, [NSString stringWithFormat:@"reset load failed: %@", error]);
+            return;
+        }
+        [manager.connection stopVPNTunnel];
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+            NSError *startError = nil;
+            BOOL ok = [manager.connection startVPNTunnelAndReturnError:&startError];
+            POCNEComplete(completion,
+                          [NSString stringWithFormat:@"reset start ok=%d error=%@",
+                           ok ? 1 : 0, startError]);
+        });
     });
 }
 

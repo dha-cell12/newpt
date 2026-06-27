@@ -4,6 +4,9 @@
 #include <inttypes.h>
 
 #include "../HIDInjectCore.h"
+#import "ProviderTCPServer.h"
+
+#define POC_PROVIDER_TCP_PORT 6001
 
 static NSString *TPSharedDir(void)
 {
@@ -80,6 +83,7 @@ static void TPExtensionImageLoaded(void)
 @interface PacketTunnelProvider : NEPacketTunnelProvider
 @property (nonatomic, strong) NSTimer *heartbeatTimer;
 @property (nonatomic, copy) NSString *lastCommand;
+@property (nonatomic, strong) ProviderTCPServer *tcpServer;
 @end
 
 @implementation PacketTunnelProvider
@@ -126,6 +130,13 @@ static void TPExtensionImageLoaded(void)
         }
 
         TPLog(@"tunnel settings applied; provider is alive");
+        __strong __typeof(weakSelf) s = weakSelf;
+        if (s && !s.tcpServer) {
+            s.tcpServer = [[ProviderTCPServer alloc] initWithPort:POC_PROVIDER_TCP_PORT];
+            int berr = 0;
+            BOOL ok = [s.tcpServer startWithErrno:&berr];
+            TPLog(@"tcpServer start ok=%d port=%u errno=%d", ok ? 1 : 0, (unsigned)POC_PROVIDER_TCP_PORT, berr);
+        }
         dispatch_async(dispatch_get_main_queue(), ^{
             __strong __typeof(weakSelf) strongSelf = weakSelf;
             if (!strongSelf) return;
@@ -146,6 +157,8 @@ static void TPExtensionImageLoaded(void)
     TPLog(@"stopTunnel reason=%ld", (long)reason);
     [self.heartbeatTimer invalidate];
     self.heartbeatTimer = nil;
+    [self.tcpServer stop];
+    self.tcpServer = nil;
     completionHandler();
 }
 

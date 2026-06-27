@@ -89,6 +89,28 @@ static HIDInjectResult HIDPostParent(IOHIDEventRef parent) {
     return r;
 }
 
+HIDInjectResult HIDInjectDispatchTouch(int type, int finger, double xPx, double yPx) {
+    HIDInjectResult r = {0};
+    if (sScreenWidth <= 0 || sScreenHeight <= 0) { r.errnoValue = EINVAL; return r; }
+    if (type != HID_TOUCH_UP && type != HID_TOUCH_DOWN && type != HID_TOUCH_MOVE) {
+        r.errnoValue = EINVAL;
+        return r;
+    }
+    IOHIDEventRef p = IOHIDEventCreateDigitizerEvent(kCFAllocatorDefault, mach_absolute_time(),
+        3, 99, 1, 0, 0, 0,0,0,0,0, 0,0,0);
+    if (!p) { r.errnoValue = errno; return r; }
+    IOHIDEventSetIntegerValue(p, 0xb0019, 1);
+    IOHIDEventSetIntegerValue(p, 0x4, 1);
+    IOHIDEventRef c = HIDChild(type, finger, (float)xPx, (float)yPx);
+    if (c) { IOHIDEventAppendEvent(p, c); CFRelease(c); }
+    IOHIDEventSetIntegerValue(p, 0xb0007, 0x23);
+    IOHIDEventSetIntegerValue(p, 0xb0008, 0x1);
+    IOHIDEventSetIntegerValue(p, 0xb0009, 0x1);
+    r = HIDPostParent(p);
+    CFRelease(p);
+    return r;
+}
+
 HIDInjectResult HIDInjectDispatchTap(double xPx, double yPx) {
     HIDInjectResult agg = {0};
     if (sScreenWidth <= 0 || sScreenHeight <= 0) { agg.errnoValue = EINVAL; return agg; }
