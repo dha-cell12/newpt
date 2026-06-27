@@ -8,6 +8,9 @@
 
 #define POC_PROVIDER_TCP_PORT 6001
 
+// ---------------------------------------------------------------------------
+// runtime.plist persistence
+// ---------------------------------------------------------------------------
 static NSString *TPRuntimePlistPath(void)
 {
     NSURL *url = [[NSFileManager defaultManager]
@@ -41,11 +44,27 @@ static void TPLoadRuntimeState(void)
           dict ? 1 : 0, w, h, sid, variant, path);
 }
 
+static void TPSaveRuntimeState(void)
+{
+    NSString *path = TPRuntimePlistPath();
+    NSDictionary *dict = @{
+        @"width":    @(HIDInjectCoreScreenWidth()),
+        @"height":   @(HIDInjectCoreScreenHeight()),
+        @"senderID": @(HIDInjectCoreSenderID()),
+        @"variant":  @(HIDInjectCoreVariant()),
+    };
+    BOOL ok = [dict writeToFile:path atomically:YES];
+    NSLog(@"[TP] runtime state saved ok=%d w=%.0f h=%.0f sid=0x%llx var=%d path=%@",
+          ok ? 1 : 0,
+          HIDInjectCoreScreenWidth(), HIDInjectCoreScreenHeight(),
+          HIDInjectCoreSenderID(), HIDInjectCoreVariant(), path);
+}
+
+// ---------------------------------------------------------------------------
+// Shared dir + logging
+// ---------------------------------------------------------------------------
 static NSString *TPSharedDir(void)
 {
-    // Use a fixed shared path for this TrollStore/no-container POC. App Group
-    // containers can resolve differently or be unavailable across the main app
-    // and the manually packaged provider extension.
     static NSString *cached = nil;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
@@ -113,9 +132,12 @@ static void TPExtensionImageLoaded(void)
     TPLog(@"extension image loaded");
 }
 
+// ---------------------------------------------------------------------------
+// PacketTunnelProvider
+// ---------------------------------------------------------------------------
 @interface PacketTunnelProvider : NEPacketTunnelProvider
 @property (nonatomic, strong) NSTimer *heartbeatTimer;
-@property (nonatomic, copy) NSString *lastCommand;
+@property (nonatomic, copy)   NSString *lastCommand;
 @property (nonatomic, strong) ProviderTCPServer *tcpServer;
 @end
 
@@ -142,9 +164,6 @@ static void TPExtensionImageLoaded(void)
     NEPacketTunnelNetworkSettings *settings = [[NEPacketTunnelNetworkSettings alloc] initWithTunnelRemoteAddress:@"127.0.0.1"];
     settings.MTU = @(1280);
 
-    // Minimal valid packet-tunnel settings. For this stage we prefer a real
-    // default route because some iOS builds reject an empty includedRoutes list
-    // and immediately disconnect the provider.
     NEIPv4Settings *ipv4 = [[NEIPv4Settings alloc] initWithAddresses:@[@"10.254.0.2"]
                                                          subnetMasks:@[@"255.255.255.0"]];
     ipv4.includedRoutes = @[[NEIPv4Route defaultRoute]];
@@ -163,28 +182,45 @@ static void TPExtensionImageLoaded(void)
         }
 
         TPLog(@"tunnel settings applied; provider is alive");
-        // Start TCP server async on a background queue so it cannot block the
-        // provider thread or interfere with the file-IPC heartbeat timer.
+
+        // 1. Restore persisted state (sid, screen size, variant) so cold-start
+        //    TCP taps don't no-op after reboot or force-quit.
+        TPLoadRuntimeState();
+
+        // 2. Warm up IOHIDEventSystemClient inside this provider process by
+        //    dispatching one off-screen MOVE event. Off-screen coords don't
+        //    produce a visible event but force client creation here, so the
+        //    first real TCP tap has a live client to dispatch through.
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_BACKGROUND, 0), ^{
+            HIDInjectResult r = HIDInjectDispatchTouch(HID_TOUCH_MOVE, 0, -1.0, -1.0);
+            TPLog(@"HID warm-up dispatched=%d errno=%d clientCreated=%d clientPtr=%p",
+                  r.dispatched, r.errnoValue, r.clientCreated, r.clientPtr);
+        });
+
+        // 3. Start TCP server async so it cannot block the provider thread
+        //    or interfere with the file-IPC heartbeat timer.
         dispatch_async(dispatch_get_global_queue(QOS_CLASS_BACKGROUND, 0), ^{
             __strong __typeof(weakSelf) s = weakSelf;
             if (!s || s.tcpServer) return;
             ProviderTCPServer *srv = [[ProviderTCPServer alloc] initWithPort:POC_PROVIDER_TCP_PORT];
             int berr = 0;
             BOOL ok = [srv startWithErrno:&berr];
-            TPLog(@"tcpServer start (async) ok=%d port=%u errno=%d", ok ? 1 : 0, (unsigned)POC_PROVIDER_TCP_PORT, berr);
+            TPLog(@"tcpServer start (async) ok=%d port=%u errno=%d",
+                  ok ? 1 : 0, (unsigned)POC_PROVIDER_TCP_PORT, berr);
             if (ok) {
                 dispatch_async(dispatch_get_main_queue(), ^{ s.tcpServer = srv; });
             }
         });
+
         dispatch_async(dispatch_get_main_queue(), ^{
             __strong __typeof(weakSelf) strongSelf = weakSelf;
             if (!strongSelf) return;
             [strongSelf.heartbeatTimer invalidate];
             strongSelf.heartbeatTimer = [NSTimer scheduledTimerWithTimeInterval:1.0
-                                                                          target:strongSelf
-                                                                        selector:@selector(heartbeatTick)
-                                                                        userInfo:nil
-                                                                         repeats:YES];
+                                                                         target:strongSelf
+                                                                       selector:@selector(heartbeatTick)
+                                                                       userInfo:nil
+                                                                        repeats:YES];
         });
         completionHandler(nil);
     }];
@@ -256,7 +292,8 @@ static void TPExtensionImageLoaded(void)
 
     if (error || command.length == 0) {
         if ((sPollTick % 1) == 0) {
-            TPLog(@"pollCommand empty tick=%lu exists=%d path=%@ error=%@", (unsigned long)sPollTick, exists ? 1 : 0, commandPath, error);
+            TPLog(@"pollCommand empty tick=%lu exists=%d path=%@ error=%@",
+                  (unsigned long)sPollTick, exists ? 1 : 0, commandPath, error);
         }
         return;
     }
@@ -273,6 +310,7 @@ static void TPExtensionImageLoaded(void)
         NSString *arg = [trimmed substringFromIndex:[@"set_variant:" length]];
         int v = [arg intValue];
         HIDInjectCoreSetVariant(v);
+        TPSaveRuntimeState();
         response = [NSString stringWithFormat:@"variant_set:%d", HIDInjectCoreVariant()];
     } else if ([trimmed hasPrefix:@"set_sender_id:"]) {
         NSString *arg = [trimmed substringFromIndex:[@"set_sender_id:" length]];
@@ -282,6 +320,7 @@ static void TPExtensionImageLoaded(void)
             s = (unsigned long long)[arg longLongValue];
         }
         HIDInjectCoreSetSenderID(s);
+        if (s != 0) TPSaveRuntimeState();
         response = [NSString stringWithFormat:@"sender_id_set:0x%llx", HIDInjectCoreSenderID()];
     } else if ([trimmed hasPrefix:@"inject_tap:"]) {
         NSString *arg = [trimmed substringFromIndex:[@"inject_tap:" length]];
@@ -294,6 +333,7 @@ static void TPExtensionImageLoaded(void)
             double w = [parts[2] doubleValue];
             double h = [parts[3] doubleValue];
             HIDInjectCoreSetScreenSize(w, h);
+            if (w > 0 && h > 0) TPSaveRuntimeState();
             HIDInjectResult r = HIDInjectDispatchTap(x, y);
             response = [NSString stringWithFormat:
                 @"inject_tap_ok x=%.1f y=%.1f w=%.0f h=%.0f variant=%d sender=0x%llx clientCreated=%d eventCreated=%d dispatched=%d senderIDUsed=%d errno=%d clientPtr=%p",
