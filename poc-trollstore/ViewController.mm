@@ -188,13 +188,19 @@
         [self.neLabel.trailingAnchor constraintEqualToAnchor:g.trailingAnchor constant:-16],
 
         [self.targetButton.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
-        [self.targetButton.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor],
-        [self.targetButton.widthAnchor constraintEqualToConstant:160],
-        [self.targetButton.heightAnchor constraintEqualToConstant:160],
+        [self.targetButton.topAnchor constraintEqualToAnchor:self.neLabel.bottomAnchor constant:24],
+        [self.targetButton.widthAnchor constraintEqualToConstant:140],
+        [self.targetButton.heightAnchor constraintEqualToConstant:140],
 
         [self.hitLabel.topAnchor constraintEqualToAnchor:self.targetButton.bottomAnchor constant:20],
         [self.hitLabel.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
     ]];
+
+    // Diagnostic row must sit above the TARGET hit-test area.
+    [self.view bringSubviewToFront:[self.view viewWithTag:5001]];
+    [self.view bringSubviewToFront:[self.view viewWithTag:5002]];
+    [self.view bringSubviewToFront:[self.view viewWithTag:5003]];
+    [self.view bringSubviewToFront:self.neLabel];
 
     [self refreshStatus];
     self.refreshTimer = [NSTimer scheduledTimerWithTimeInterval:1.0
@@ -303,6 +309,33 @@
     self.neLabel.text = @"NE: stop requested";
     POCNEStop(^(NSString *status) {
         [self setTunnelStatus:status prefix:@"Stop"];
+    });
+}
+
+- (void)statusPressed:(UIButton *)sender
+{
+    (void)sender;
+    self.neLabel.text = @"NE: querying status...";
+    POCNEStatus(^(NSString *status) {
+        [self setTunnelStatus:status prefix:@"Status"];
+    });
+}
+
+- (void)readLogPressed:(UIButton *)sender
+{
+    (void)sender;
+    self.neLabel.text = @"NE: reading provider log...";
+    POCNEReadProviderLog(^(NSString *status) {
+        [self setTunnelStatus:status prefix:@"Log"];
+    });
+}
+
+- (void)filePingPressed:(UIButton *)sender
+{
+    (void)sender;
+    self.neLabel.text = @"NE: file ping...";
+    POCNESendFilePing(^(NSString *status) {
+        [self setTunnelStatus:status prefix:@"FilePing"];
     });
 }
 

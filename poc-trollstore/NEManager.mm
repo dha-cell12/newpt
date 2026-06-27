@@ -106,11 +106,24 @@ void POCNEStatus(void (^completion)(NSString *status))
             POCNEComplete(completion, [NSString stringWithFormat:@"status load failed: %@", error]);
             return;
         }
-        NETunnelProviderProtocol *proto = (NETunnelProviderProtocol *)manager.protocolConfiguration;
+
+        // Hardened: guard against nil connection and wrong-class protocol
+        // configuration so this never crashes the app.
+        NEVPNConnection *conn = manager.connection;
+        NSString *statusStr = conn ? POCNEStatusName(conn.status) : @"<no connection>";
+
+        NSString *providerBID = @"<nil>";
+        id pcfg = manager.protocolConfiguration;
+        if ([pcfg isKindOfClass:[NETunnelProviderProtocol class]]) {
+            providerBID = [(NETunnelProviderProtocol *)pcfg providerBundleIdentifier] ?: @"<nil>";
+        } else if (pcfg) {
+            providerBID = [NSString stringWithFormat:@"<not-NETunnelProviderProtocol: %@>", NSStringFromClass([pcfg class])];
+        }
+
         NSString *line = [NSString stringWithFormat:@"enabled=%@ status=%@ provider=%@ desc=%@",
                           manager.enabled ? @"YES" : @"NO",
-                          POCNEStatusName(manager.connection.status),
-                          proto.providerBundleIdentifier ?: @"<nil>",
+                          statusStr,
+                          providerBID,
                           manager.localizedDescription ?: @"<nil>"];
         POCNEComplete(completion, line);
     });
