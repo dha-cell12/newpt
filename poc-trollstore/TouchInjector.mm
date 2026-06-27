@@ -116,6 +116,34 @@ static NSString *POCSenderIDPlistPath(void)
     return [dir stringByAppendingPathComponent:@"senderid.plist"];
 }
 
+static NSString *POCSharedRuntimePath(void)
+{
+    NSURL *url = [[NSFileManager defaultManager]
+        containerURLForSecurityApplicationGroupIdentifier:@"group.com.poc.trollstore.touch"];
+    NSString *dir = url ? [url path] : @"/var/mobile/Library/TouchPOCShared";
+    [[NSFileManager defaultManager] createDirectoryAtPath:dir
+                              withIntermediateDirectories:YES
+                                               attributes:nil
+                                                    error:nil];
+    return [dir stringByAppendingPathComponent:@"runtime.plist"];
+}
+
+static void POCWriteRuntimeState(void)
+{
+    NSDictionary *dict = @{
+        @"width":    @((double)sScreenWidth),
+        @"height":   @((double)sScreenHeight),
+        @"senderID": @((unsigned long long)sSenderID),
+        @"variant":  @((int)sDispatchVariant),
+    };
+    NSString *path = POCSharedRuntimePath();
+    BOOL ok = [dict writeToFile:path atomically:YES];
+    POCLogf("runtime state write ok=%d w=%.0f h=%.0f sid=0x%llx var=%d",
+            ok ? 1 : 0,
+            (double)sScreenWidth, (double)sScreenHeight,
+            (unsigned long long)sSenderID, (int)sDispatchVariant);
+}
+
 static void POCStopSenderIDCallback(void)
 {
     if (sSenderIDClient == NULL) return;
@@ -143,6 +171,7 @@ static void POCSenderIDCallback(void *target, void *refcon, IOHIDServiceRef serv
     [dict writeToFile:POCSenderIDPlistPath() atomically:YES];
 
     POCLogf("captured senderID=%llX", sSenderID);
+    POCWriteRuntimeState();
     dispatch_async(dispatch_get_main_queue(), ^{ POCStopSenderIDCallback(); });
 }
 
@@ -404,6 +433,7 @@ void POCTouchInit(void)
     }
     POCReadScreenSize();
     POCInitSenderID();
+    POCWriteRuntimeState();
     POCLogf("POCTouchInit done (variant=%d)", sDispatchVariant);
 }
 
@@ -412,6 +442,7 @@ void POCSetDispatchVariant(int variant)
     if (variant < 0 || variant > 3) variant = 0;
     sDispatchVariant = variant;
     POCLogf("dispatch variant set to %d (%s)", sDispatchVariant, POCDispatchVariantName(sDispatchVariant));
+    POCWriteRuntimeState();
 }
 
 void POCSelfTestTapAtPoint(double xPoint, double yPoint)

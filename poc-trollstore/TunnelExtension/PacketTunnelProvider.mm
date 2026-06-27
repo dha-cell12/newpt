@@ -8,6 +8,36 @@
 
 #define POC_PROVIDER_TCP_PORT 6001
 
+static NSString *TPRuntimePlistPath(void)
+{
+    NSURL *url = [[NSFileManager defaultManager]
+        containerURLForSecurityApplicationGroupIdentifier:@"group.com.poc.trollstore.touch"];
+    NSString *dir = url ? [url path] : @"/var/mobile/Library/TouchPOCShared";
+    return [dir stringByAppendingPathComponent:@"runtime.plist"];
+}
+
+static void TPLoadRuntimeState(void)
+{
+    NSString *path = TPRuntimePlistPath();
+    NSDictionary *dict = [NSDictionary dictionaryWithContentsOfFile:path];
+    double w = 1242.0, h = 2208.0;
+    unsigned long long sid = 0;
+    int variant = 0;
+    if (dict) {
+        double dw = [dict[@"width"]  doubleValue];
+        double dh = [dict[@"height"] doubleValue];
+        if (dw > 0) w = dw;
+        if (dh > 0) h = dh;
+        sid = (unsigned long long)[dict[@"senderID"] unsignedLongLongValue];
+        variant = [dict[@"variant"] intValue];
+    }
+    HIDInjectCoreSetScreenSize(w, h);
+    HIDInjectCoreSetVariant(variant);
+    if (sid != 0) HIDInjectCoreSetSenderID(sid);
+    NSLog(@"[TP] runtime state loaded dict=%d w=%.0f h=%.0f sid=0x%llx var=%d path=%@",
+          dict ? 1 : 0, w, h, sid, variant, path);
+}
+
 static NSString *TPSharedDir(void)
 {
     // Use a fixed shared path for this TrollStore/no-container POC. App Group
@@ -130,6 +160,7 @@ static void TPExtensionImageLoaded(void)
         }
 
         TPLog(@"tunnel settings applied; provider is alive");
+        TPLoadRuntimeState();
         __strong __typeof(weakSelf) s = weakSelf;
         if (s && !s.tcpServer) {
             s.tcpServer = [[ProviderTCPServer alloc] initWithPort:POC_PROVIDER_TCP_PORT];
