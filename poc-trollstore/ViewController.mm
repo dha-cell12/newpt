@@ -372,6 +372,49 @@
     });
 }
 
+- (void)injectViaProviderPressed:(UIButton *)sender
+{
+    (void)sender;
+    CGFloat scale = [[UIScreen mainScreen] scale];
+    CGFloat wPt = [UIScreen mainScreen].bounds.size.width;
+    CGFloat hPt = [UIScreen mainScreen].bounds.size.height;
+    CGFloat wPx = wPt * scale;
+    CGFloat hPx = hPt * scale;
+    CGPoint centerPt = CGPointMake(CGRectGetMidX(self.view.bounds), CGRectGetMidY(self.view.bounds));
+    CGFloat xPx = centerPt.x * scale;
+    CGFloat yPx = centerPt.y * scale;
+    NSString *msg = [NSString stringWithFormat:@"NE: inject_tap x=%.0f y=%.0f w=%.0f h=%.0f", xPx, yPx, wPx, hPx];
+    self.neLabel.text = msg;
+    POCLogf("UI: provider inject_tap x=%.0f y=%.0f w=%.0f h=%.0f", xPx, yPx, wPx, hPx);
+    POCNESendInjectTap(xPx, yPx, wPx, hPx, ^(NSString *status) {
+        [self setTunnelStatus:status prefix:@"InjectTap"];
+    });
+}
+
+- (void)syncSenderIDPressed:(UIButton *)sender
+{
+    (void)sender;
+    unsigned long long sid = POCTouchCurrentSenderID();
+    if (sid == 0) {
+        [self setTunnelStatus:@"host senderID is 0 -- tap the screen first so the host's capture callback grabs a real ID, then retry." prefix:@"SyncID"];
+        return;
+    }
+    self.neLabel.text = [NSString stringWithFormat:@"NE: pushing senderID=0x%llx to provider...", sid];
+    POCNESendSetSenderID(sid, ^(NSString *status) {
+        [self setTunnelStatus:status prefix:@"SyncID"];
+    });
+}
+
+- (void)syncVariantPressed:(UIButton *)sender
+{
+    (void)sender;
+    int v = POCTouchDispatchVariant();
+    self.neLabel.text = [NSString stringWithFormat:@"NE: pushing variant=%d to provider...", v];
+    POCNESendSetVariant(v, ^(NSString *status) {
+        [self setTunnelStatus:status prefix:@"SyncVar"];
+    });
+}
+
 - (void)targetHit:(UIButton *)sender
 {
     (void)sender;

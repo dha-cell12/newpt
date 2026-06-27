@@ -117,6 +117,7 @@ static void TPExtensionImageLoaded(void)
     dns.matchDomains = @[@""];
     settings.DNSSettings = dns;
 
+    __weak __typeof(self) weakSelf = self;
     [self setTunnelNetworkSettings:settings completionHandler:^(NSError * _Nullable error) {
         if (error) {
             TPLog(@"setTunnelNetworkSettings error=%@", error);
@@ -126,12 +127,14 @@ static void TPExtensionImageLoaded(void)
 
         TPLog(@"tunnel settings applied; provider is alive");
         dispatch_async(dispatch_get_main_queue(), ^{
-            [self.heartbeatTimer invalidate];
-            self.heartbeatTimer = [NSTimer scheduledTimerWithTimeInterval:1.0
-                                                                    target:self
-                                                                  selector:@selector(heartbeatTick)
-                                                                  userInfo:nil
-                                                                   repeats:YES];
+            __strong __typeof(weakSelf) strongSelf = weakSelf;
+            if (!strongSelf) return;
+            [strongSelf.heartbeatTimer invalidate];
+            strongSelf.heartbeatTimer = [NSTimer scheduledTimerWithTimeInterval:1.0
+                                                                          target:strongSelf
+                                                                        selector:@selector(heartbeatTick)
+                                                                        userInfo:nil
+                                                                         repeats:YES];
         });
         completionHandler(nil);
     }];
