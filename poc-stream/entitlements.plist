@@ -1,1 +1,32 @@
-﻿<plist version="1.0"><dict><key>platform-application</key><true/><key>com.apple.QuartzCore.global-capture</key><true/><key>com.apple.QuartzCore.secure-capture</key><true/><key>com.apple.QuartzCore.secure-mode</key><true/><key>com.apple.private.IOSurface.protected-access</key><true/><key>com.apple.private.allow-explicit-graphics-priority</key><true/><key>com.apple.private.security.no-container</key><true/><key>com.apple.private.security.no-sandbox</key><true/><key>com.apple.private.security.container-required</key><false/><key>com.apple.developer.team-identifier</key><string>StreamPOC</string><key>application-identifier</key><string>StreamPOC.com.poc.trollstore.stream</string></dict></plist>
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>platform-application</key>
+	<true/>
+	<key>com.apple.developer.team-identifier</key>
+	<string>StreamPOC</string>
+	<key>application-identifier</key>
+	<string>StreamPOC.com.poc.trollstore.stream</string>
+	<key>keychain-access-groups</key>
+	<array>
+		<string>StreamPOC.com.poc.trollstore.stream</string>
+	</array>
+	<key>com.apple.private.security.no-container</key>
+	<true/>
+	<key>com.apple.private.security.no-sandbox</key>
+	<true/>
+	<key>com.apple.private.security.container-required</key>
+	<false/>
+	<key>com.apple.QuartzCore.global-capture</key>
+	<true/>
+	<key>com.apple.QuartzCore.secure-capture</key>
+	<true/>
+	<key>com.apple.QuartzCore.secure-mode</key>
+	<true/>
+	<key>com.apple.private.allow-explicit-graphics-priority</key>
+	<true/>
+	<key>com.apple.private.IOSurface.protected-access</key>
+	<true/>
+</dict>
+</plist>
