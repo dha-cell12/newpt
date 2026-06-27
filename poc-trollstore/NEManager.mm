@@ -191,28 +191,113 @@ void POCNESendPing(void (^completion)(NSString *status))
             return;
         }
 
-        NSData *msg = [@"ping" dataUsingEncoding:NSUTF8StringEncoding];
-        NSError *sendError = nil;
-        BOOL sent = [(NETunnelProviderSession *)manager.connection sendProviderMessage:msg
-                                                                           returnError:&sendError
-                                                                       responseHandler:^(NSData *responseData) {
-            if (!responseData) {
-                POCNEComplete(completion, @"provider replied: <nil responseData>");
-                return;
+        NETunnelProviderSession *session = (NETunnelProviderSession *)manager.connection;
+
+        // Send block. Keeps strong ref to `manager` so the session is not
+        // deallocated between the request and response handler.
+        void (^doSend)(void) = ^{
+            NSData *msg = [@"ping" dataUsingEncoding:NSUTF8StringEncoding];
+            NSError *sendError = nil;
+            BOOL sent = [session sendProviderMessage:msg
+                                         returnError:&sendError
+                                     responseHandler:^(NSData *responseData) {
+                (void)manager; // keep manager alive until response arrives
+                if (!responseData) {
+                    POCNEComplete(completion, @"provider replied: <nil responseData>");
+                    return;
+                }
+                if (responseData.length == 0) {
+                    POCNEComplete(completion, @"provider replied: <zero length responseData>");
+                    return;
+                }
+                NSString *response = [[NSString alloc] initWithData:responseData encoding:NSUTF8StringEncoding] ?: @"<non-utf8>";
+                POCNEComplete(completion, [NSString stringWithFormat:@"provider replied: %@", response]);
+            }];
+
+            if (!sent || sendError) {
+                NSString *line = [NSString stringWithFormat:@"ping send returned NO error=%@ status=%@",
+                                  sendError,
+                                  POCNEStatusName(session.status)];
+                POCNEComplete(completion, line);
             }
-            if (responseData.length == 0) {
-                POCNEComplete(completion, @"provider replied: <zero length responseData>");
-                return;
+        };
+
+        NEVPNStatus status = session.status;
+
+        // Case 1: already Connected -> send immediately.
+        if (status == NEVPNStatusConnected) {
+            doSend();
+            return;
+        }
+
+        // Case 2: terminal/invalid states -> fail fast, no point waiting.
+        if (status == NEVPNStatusDisconnected ||
+            status == NEVPNStatusInvalid ||
+            status == NEVPNStatusDisconnecting) {
+            POCNEComplete(completion,
+                          [NSString stringWithFormat:@"not connected, status=%@ (call Install & Start first)",
+                           POCNEStatusName(status)]);
+            return;
+        }
+
+        // Case 3: Connecting / Reasserting -> observe status, send on Connected,
+        // bail on Disconnected/Invalid, hard timeout at 10s. Single-shot via
+        // `completed` flag guarded by @synchronized to prevent double-fire.
+        __block id observer = nil;
+        __block BOOL completed = NO;
+        NSObject *lock = [NSObject new];
+
+        void (^cleanup)(void) = ^{
+            @synchronized (lock) {
+                if (observer) {
+                    [[NSNotificationCenter defaultCenter] removeObserver:observer];
+                    observer = nil;
+                }
             }
-            NSString *response = [[NSString alloc] initWithData:responseData encoding:NSUTF8StringEncoding] ?: @"<non-utf8>";
-            POCNEComplete(completion, [NSString stringWithFormat:@"provider replied: %@", response]);
+        };
+
+        observer = [[NSNotificationCenter defaultCenter]
+                    addObserverForName:NEVPNStatusDidChangeNotification
+                                object:session
+                                 queue:[NSOperationQueue mainQueue]
+                            usingBlock:^(NSNotification *note) {
+            NEVPNStatus s = session.status;
+            if (s == NEVPNStatusConnected) {
+                BOOL shouldFire = NO;
+                @synchronized (lock) {
+                    if (!completed) { completed = YES; shouldFire = YES; }
+                }
+                if (shouldFire) {
+                    cleanup();
+                    doSend();
+                }
+            } else if (s == NEVPNStatusDisconnected || s == NEVPNStatusInvalid) {
+                BOOL shouldFire = NO;
+                @synchronized (lock) {
+                    if (!completed) { completed = YES; shouldFire = YES; }
+                }
+                if (shouldFire) {
+                    cleanup();
+                    POCNEComplete(completion,
+                                  [NSString stringWithFormat:@"tunnel transitioned to %@ before Connected",
+                                   POCNEStatusName(s)]);
+                }
+            }
         }];
 
-        if (!sent || sendError) {
-            NSString *line = [NSString stringWithFormat:@"ping send returned NO error=%@ status=%@",
-                              sendError,
-                              POCNEStatusName(manager.connection.status)];
-            POCNEComplete(completion, line);
-        }
+        // Hard timeout 10s.
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(10.0 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+            BOOL shouldFire = NO;
+            @synchronized (lock) {
+                if (!completed) { completed = YES; shouldFire = YES; }
+            }
+            if (shouldFire) {
+                cleanup();
+                POCNEComplete(completion,
+                              [NSString stringWithFormat:@"timeout waiting for Connected, last status=%@",
+                               POCNEStatusName(session.status)]);
+            }
+        });
     });
 }

@@ -17,7 +17,7 @@
 // can determine which IOHID client type, if any, can inject touches on iOS 15-16:
 //
 //   Variant A: IOHIDEventSystemClientCreate
-//   Variant B: IOHIDEventSystemClientCreateWithType(Admin=0)
+//   Variant B: IOHIDEventSystemClientCreateWithType(Passive=2) [was Admin=0]
 //   Variant C: IOHIDEventSystemClientCreateWithType(Monitor=1)
 //   Variant D: IOHIDEventSystemClientCreateWithType(Passive=2)
 //
@@ -252,8 +252,16 @@ static IOHIDEventSystemClientRef POCDispatchClient(void)
             clients[variant] = IOHIDEventSystemClientCreate(kCFAllocatorDefault);
             break;
         case 1:
+            // Variant B = Passive HID client (type 2).
+            // Background: user-land apps cannot dispatch events through an Admin
+            // client (type 0). On iOS 15-16, creating an Admin client from a
+            // TrollStore app installs a monitor that swallows touches before
+            // UIKit can dispatch them, and CreateWithType(Admin) does not
+            // actually inject events back into the system. Passive is the
+            // correct type for user-land dispatch when the process holds the
+            // com.apple.private.hid.client.event-dispatch entitlement.
             clients[variant] = IOHIDEventSystemClientCreateWithType(kCFAllocatorDefault,
-                                                                     POC_HID_CLIENT_TYPE_ADMIN,
+                                                                     POC_HID_CLIENT_TYPE_PASSIVE,
                                                                      NULL);
             break;
         case 2:
