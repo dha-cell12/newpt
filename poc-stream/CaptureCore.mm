@@ -2,7 +2,9 @@
 
 #import <UIKit/UIKit.h>
 #import <CoreFoundation/CoreFoundation.h>
-#import <mach/mach_time.h>
+#import <errno.h>
+
+typedef struct __IOSurface *IOSurfaceRef;
 
 // ---------------------------------------------------------------------------
 // CaptureCore

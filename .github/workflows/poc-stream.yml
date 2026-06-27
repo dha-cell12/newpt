@@ -1,0 +1,108 @@
+name: Build POC Stream App
+
+on:
+  push:
+    paths:
+      - 'poc-stream/**'
+      - '.github/workflows/poc-stream.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          brew install ldid xz
+
+      - name: Set up Theos
+        env:
+          THEOS: ${{ github.workspace }}/theos
+        run: |
+          git clone --quiet --recursive https://github.com/theos/theos.git "$THEOS"
+          echo "THEOS=$THEOS" >> "$GITHUB_ENV"
+
+      - name: Download iOS SDK
+        env:
+          THEOS: ${{ github.workspace }}/theos
+        run: |
+          cd "$THEOS/sdks"
+          curl -sL https://github.com/theos/sdks/archive/refs/heads/master.zip -o sdks.zip
+          unzip -q sdks.zip
+          mv sdks-master/*.sdk . || true
+          rm -rf sdks-master sdks.zip
+          ls -1
+
+      - name: Build and stage .app
+        env:
+          THEOS: ${{ github.workspace }}/theos
+        working-directory: poc-stream
+        run: |
+          make clean || true
+          make stage FINALPACKAGE=1
+          echo "--- staging tree ---"
+          find .theos -maxdepth 4 -name '*.app' -type d || true
+          APP=".theos/_/Applications/StreamPOC.app"
+          if [ ! -d "$APP" ]; then
+            APP=$(find .theos/_ -maxdepth 6 -name 'StreamPOC.app' -type d | head -n1)
+          fi
+          if [ -z "$APP" ]; then
+            echo "ERROR: StreamPOC.app not found after stage."
+            exit 1
+          fi
+          if [ ! -f "$APP/Info.plist" ]; then
+            echo "Info.plist missing from staged app; copying project Info.plist into bundle root."
+            cp Info.plist "$APP/Info.plist"
+          fi
+          test -f "$APP/Info.plist"
+          echo "--- app entitlements ---"
+          ldid -e "$APP/StreamPOC" || true
+
+      - name: Package .tipa
+        working-directory: poc-stream
+        run: |
+          set -e
+          APP=".theos/_/Applications/StreamPOC.app"
+          if [ ! -d "$APP" ]; then
+            APP=$(find .theos/_ -maxdepth 6 -name 'StreamPOC.app' -type d | head -n1)
+          fi
+          if [ -z "$APP" ]; then
+            echo "ERROR: StreamPOC.app not found in staging output."
+            find .theos -maxdepth 5 -type d | head -100
+            exit 1
+          fi
+          echo "Found app: $APP"
+          if [ ! -f "$APP/Info.plist" ]; then
+            cp Info.plist "$APP/Info.plist"
+          fi
+          test -f "$APP/Info.plist"
+          rm -rf _payload
+          mkdir -p _payload/Payload
+          cp -R "$APP" _payload/Payload/StreamPOC.app
+          test -f _payload/Payload/StreamPOC.app/Info.plist
+          mkdir -p packages
+          rm -f packages/StreamPOC.tipa
+          ( cd _payload && zip -qr9 ../packages/StreamPOC.tipa Payload )
+          unzip -l packages/StreamPOC.tipa | grep 'Payload/StreamPOC.app/Info.plist'
+          ls -la packages
+
+      - name: Locate artifact
+        id: artifact
+        working-directory: poc-stream
+        run: |
+          FILE=$(ls -1 packages/*.tipa 2>/dev/null | head -n1 || true)
+          if [ -z "$FILE" ]; then
+            echo "No .tipa produced."
+            exit 1
+          fi
+          echo "path=poc-stream/$FILE" >> "$GITHUB_OUTPUT"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: StreamPOC-tipa
+          path: ${{ steps.artifact.outputs.path }}
+          if-no-files-found: error
