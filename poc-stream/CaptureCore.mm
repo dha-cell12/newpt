@@ -2,10 +2,15 @@
 
 #import <UIKit/UIKit.h>
 #import <CoreFoundation/CoreFoundation.h>
-#import <Security/Security.h>
 #import <errno.h>
 
 typedef struct __IOSurface *IOSurfaceRef;
+typedef struct __SecTask *SecTaskRef;
+
+extern "C" {
+SecTaskRef SecTaskCreateFromSelf(CFAllocatorRef allocator);
+CFTypeRef SecTaskCopyValueForEntitlement(SecTaskRef task, CFStringRef entitlement, CFErrorRef *error);
+}
 
 // ---------------------------------------------------------------------------
 // CaptureCore
