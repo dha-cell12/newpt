@@ -1,0 +1,3 @@
+# Placeholder cho root helper (clear keychain / app data) — thêm sau.
+# Spawn qua spawnRoot + persona-mgmt, khai trong app/Info.plist TSRootBinaries.
+# KHÔNG ảnh hưởng streamd (đường stream/click chạy không cần root).

@@ -1,0 +1,146 @@
+name: Build Stream App
+
+on:
+  push:
+    paths:
+      - 'stream-app/**'
+      - '.github/workflows/stream-app.yml'
+  pull_request:
+    paths:
+      - 'stream-app/**'
+      - '.github/workflows/stream-app.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    env:
+      THEOS: ${{ github.workspace }}/theos
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          brew install ldid xz
+
+      - name: Set up Theos
+        run: |
+          git clone --quiet --recursive https://github.com/theos/theos.git "$THEOS"
+          echo "THEOS=$THEOS" >> "$GITHUB_ENV"
+
+      - name: Download iOS SDKs
+        run: |
+          cd "$THEOS/sdks"
+          curl -sL https://github.com/theos/sdks/archive/refs/heads/master.zip -o sdks.zip
+          unzip -q sdks.zip
+          mv sdks-master/*.sdk . || true
+          rm -rf sdks-master sdks.zip
+          ls -1
+
+      - name: Build streamd
+        working-directory: stream-app/streamd
+        run: |
+          set -euo pipefail
+          make clean || true
+          make stage FINALPACKAGE=1
+          echo "--- streamd staging tree ---"
+          find .theos -maxdepth 6 -type f | sort
+          STREAMD=".theos/_/usr/bin/streamd"
+          if [ ! -f "$STREAMD" ]; then
+            STREAMD=$(find .theos -maxdepth 8 -type f -name 'streamd' ! -path '*/dSYM/*' | head -n1)
+          fi
+          if [ -z "${STREAMD:-}" ] || [ ! -f "$STREAMD" ]; then
+            echo "ERROR: streamd executable not found after stage."
+            exit 1
+          fi
+          chmod 755 "$STREAMD"
+          echo "streamd=$STREAMD" >> "$GITHUB_ENV"
+          file "$STREAMD" || true
+          ldid -e "$STREAMD" || true
+
+      - name: Build StreamControl app
+        working-directory: stream-app/app
+        run: |
+          set -euo pipefail
+          make clean || true
+          make stage FINALPACKAGE=1
+          echo "--- app staging tree ---"
+          find .theos -maxdepth 6 -type d | sort
+          APP=".theos/_/Applications/StreamControl.app"
+          if [ ! -d "$APP" ]; then
+            APP=$(find .theos/_ -maxdepth 8 -name 'StreamControl.app' -type d | head -n1)
+          fi
+          if [ -z "${APP:-}" ] || [ ! -d "$APP" ]; then
+            echo "ERROR: StreamControl.app not found after stage."
+            exit 1
+          fi
+          if [ ! -f "$APP/Info.plist" ]; then
+            echo "Info.plist missing from staged app; copying project Info.plist into bundle root."
+            cp Info.plist "$APP/Info.plist"
+          fi
+          test -f "$APP/Info.plist"
+          echo "app=$APP" >> "$GITHUB_ENV"
+
+      - name: Embed streamd into app bundle
+        working-directory: stream-app
+        run: |
+          set -euo pipefail
+          APP="app/.theos/_/Applications/StreamControl.app"
+          if [ ! -d "$APP" ]; then
+            APP=$(find app/.theos/_ -maxdepth 8 -name 'StreamControl.app' -type d | head -n1)
+          fi
+          STREAMD="streamd/.theos/_/usr/bin/streamd"
+          if [ ! -f "$STREAMD" ]; then
+            STREAMD=$(find streamd/.theos -maxdepth 8 -type f -name 'streamd' ! -path '*/dSYM/*' | head -n1)
+          fi
+          if [ -z "${APP:-}" ] || [ ! -d "$APP" ]; then
+            echo "ERROR: StreamControl.app not found before embedding streamd."
+            exit 1
+          fi
+          if [ -z "${STREAMD:-}" ] || [ ! -f "$STREAMD" ]; then
+            echo "ERROR: streamd executable not found before embedding."
+            exit 1
+          fi
+          cp "$STREAMD" "$APP/streamd"
+          chmod 755 "$APP/streamd"
+          ldid -Sstreamd/entitlements.plist "$APP/streamd"
+          ldid -Sapp/entitlements.plist "$APP/StreamControl"
+          test -x "$APP/streamd"
+          test -f "$APP/Info.plist"
+          echo "--- final bundle files ---"
+          find "$APP" -maxdepth 2 -type f | sort
+          echo "--- StreamControl entitlements ---"
+          ldid -e "$APP/StreamControl" || true
+          echo "--- streamd entitlements ---"
+          ldid -e "$APP/streamd" || true
+
+      - name: Package .tipa
+        working-directory: stream-app
+        run: |
+          set -euo pipefail
+          APP="app/.theos/_/Applications/StreamControl.app"
+          if [ ! -d "$APP" ]; then
+            APP=$(find app/.theos/_ -maxdepth 8 -name 'StreamControl.app' -type d | head -n1)
+          fi
+          if [ -z "${APP:-}" ] || [ ! -d "$APP" ]; then
+            echo "ERROR: StreamControl.app not found for packaging."
+            exit 1
+          fi
+          rm -rf _payload packages
+          mkdir -p _payload/Payload packages
+          cp -R "$APP" _payload/Payload/StreamControl.app
+          test -f _payload/Payload/StreamControl.app/Info.plist
+          test -x _payload/Payload/StreamControl.app/StreamControl
+          test -x _payload/Payload/StreamControl.app/streamd
+          ( cd _payload && zip -qr9 ../packages/StreamControl.tipa Payload )
+          unzip -l packages/StreamControl.tipa | grep 'Payload/StreamControl.app/Info.plist'
+          unzip -l packages/StreamControl.tipa | grep 'Payload/StreamControl.app/streamd'
+          ls -la packages
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: StreamControl-tipa
+          path: stream-app/packages/StreamControl.tipa
+          if-no-files-found: error

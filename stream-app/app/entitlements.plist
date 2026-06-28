@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- ================================================================ -->
+	<!-- StreamControl app: UI + supervisor (spawns streamd, NON-root)     -->
+	<!-- ================================================================ -->
+	<key>platform-application</key>
+	<true/>
+	<key>com.apple.developer.team-identifier</key>
+	<string>StreamCtl</string>
+	<key>application-identifier</key>
+	<string>StreamCtl.com.tlinkauto.streamcontrol</string>
+	<key>keychain-access-groups</key>
+	<array>
+		<string>StreamCtl.com.tlinkauto.streamcontrol</string>
+	</array>
+	<key>com.apple.private.security.no-container</key>
+	<true/>
+	<key>com.apple.private.security.no-sandbox</key>
+	<true/>
+	<key>com.apple.private.security.container-required</key>
+	<false/>
+
+	<!-- ================================================================ -->
+	<!-- RESERVED for future root helper (privhelper):                     -->
+	<!-- persona-mgmt allows spawnRoot of binaries listed in              -->
+	<!-- Info.plist TSRootBinaries. Harmless when no helper is spawned.    -->
+	<!-- ================================================================ -->
+	<key>com.apple.private.persona-mgmt</key>
+	<true/>
+</dict>
+</plist>

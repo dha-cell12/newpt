@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- ================================================================ -->
+	<!-- Base: platform binary, unsandboxed (TrollStore-signable group)    -->
+	<!-- ================================================================ -->
+	<key>platform-application</key>
+	<true/>
+	<key>com.apple.developer.team-identifier</key>
+	<string>StreamCtl</string>
+	<key>application-identifier</key>
+	<string>StreamCtl.com.tlinkauto.streamd</string>
+	<key>keychain-access-groups</key>
+	<array>
+		<string>StreamCtl.com.tlinkauto.streamd</string>
+	</array>
+	<key>com.apple.private.security.no-container</key>
+	<true/>
+	<key>com.apple.private.security.no-sandbox</key>
+	<true/>
+	<key>com.apple.private.security.container-required</key>
+	<false/>
+
+	<!-- ================================================================ -->
+	<!-- Group A: SCREEN CAPTURE (proven in poc-stream on iOS 15.8.8)       -->
+	<!-- ================================================================ -->
+	<key>com.apple.QuartzCore.global-capture</key>
+	<true/>
+	<key>com.apple.QuartzCore.secure-capture</key>
+	<true/>
+	<key>com.apple.QuartzCore.secure-mode</key>
+	<true/>
+	<key>com.apple.private.allow-explicit-graphics-priority</key>
+	<true/>
+	<key>com.apple.private.IOSurface.protected-access</key>
+	<true/>
+
+	<!-- ================================================================ -->
+	<!-- Group B: HID INJECTION (proven in poc-trollstore)                 -->
+	<!-- ================================================================ -->
+	<key>com.apple.private.hid.client.event-dispatch</key>
+	<true/>
+	<key>com.apple.private.hid.client.event-monitor</key>
+	<true/>
+	<key>com.apple.private.hid.client.event-filter</key>
+	<true/>
+	<key>com.apple.private.hid.client.service-protected</key>
+	<true/>
+	<key>com.apple.private.hid.manager.client</key>
+	<true/>
+	<key>com.apple.hid.system.user-access-service</key>
+	<true/>
+	<key>com.apple.hid.manager.user-access-device</key>
+	<true/>
+
+	<!-- ================================================================ -->
+	<!-- IOKit user-client classes: UNION of capture + HID needs           -->
+	<!-- (iOS 15.8.8 returns NULL at IOSurfaceCreate without these)        -->
+	<!-- ================================================================ -->
+	<key>com.apple.security.exception.iokit-user-client-class</key>
+	<array>
+		<!-- capture -->
+		<string>IOSurfaceRootUserClient</string>
+		<string>IOSurfaceAcceleratorClient</string>
+		<string>IOMobileFramebufferUserClient</string>
+		<string>IOAccelContext</string>
+		<string>IOAccelDevice</string>
+		<!-- HID -->
+		<string>IOHIDEventSystemUserClient</string>
+		<string>IOHIDLibUserClient</string>
+		<string>IOHIDUserDevice</string>
+		<string>IOHIDResourceUserClient</string>
+		<string>IOHIDParamUserClient</string>
+	</array>
+	<key>com.apple.security.iokit-user-client-class</key>
+	<array>
+		<string>IOSurfaceRootUserClient</string>
+		<string>IOSurfaceAcceleratorClient</string>
+		<string>IOMobileFramebufferUserClient</string>
+		<string>IOAccelContext</string>
+		<string>IOAccelDevice</string>
+		<string>IOHIDEventSystemUserClient</string>
+		<string>IOHIDLibUserClient</string>
+		<string>IOHIDUserDevice</string>
+		<string>IOHIDResourceUserClient</string>
+		<string>IOHIDParamUserClient</string>
+	</array>
+
+	<!-- Mach service lookups used by HID/backboard paths on some builds. -->
+	<key>com.apple.security.exception.mach-lookup.global-name</key>
+	<array>
+		<string>com.apple.backboard.hid.services</string>
+		<string>com.apple.backboardservices</string>
+		<string>com.apple.iohideventsystem</string>
+	</array>
+</dict>
+</plist>
