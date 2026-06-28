@@ -11,11 +11,12 @@
 // ---------------------------------------------------------------------------
 // streamd - unified click + stream daemon (NON-root)
 //
-// Phase 1: click path is now live.
+// Phase 2: click path + capture probe are now live.
 //   - POCTouchInit() initializes screen geometry, dispatch variant, senderID cache.
 //   - POCStartSocketServer() listens on TCP 6000 and handles legacy task 10.
+//   - SCStreamScheduleStartupCaptureProbe() verifies capture entitlement at startup.
 //
-// Stream capture/H.264 will be added in later phases.
+// Continuous H.264 streaming will be added in Phase 3.
 // ---------------------------------------------------------------------------
 
 static void streamdLog(const char *msg)
@@ -36,7 +37,7 @@ int main(int argc, char *argv[])
         }
 
         streamdLog(daemon ? "starting (daemon mode)" : "starting (foreground)");
-        streamdLog("phase 1: initializing click/touch subsystem");
+        streamdLog("phase 2: initializing click/touch + capture probe subsystem");
 
         POCTouchInit();
         POCStartSocketServer();
@@ -67,4 +68,6 @@ int main(int argc, char *argv[])
     }
     return 0;
 }
+
+
 

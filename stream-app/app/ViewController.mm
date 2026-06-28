@@ -94,13 +94,24 @@
     return b;
 }
 
-- (void)onStart { [_supervisor start]; }
+- (void)onStart
+{
+    [_supervisor start];
+    [self appendLog:@"status probe scheduled; checking task 97 after spawn"];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)),
+                   dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSString *resp = [self sendToClickPortAndRead:@"97\n"];
+        [self appendLog:[NSString stringWithFormat:@"streamd status response: %@", resp ?: @"<no response>"]];
+    });
+}
 - (void)onStop { [_supervisor stop]; }
 
 - (void)onCaptureProbe
 {
-    [self appendLog:@"capture probe: sending task 98"];
+    [self appendLog:@"capture probe: checking task 97 then sending task 98"];
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSString *status = [self sendToClickPortAndRead:@"97\n"];
+        [self appendLog:[NSString stringWithFormat:@"streamd status response: %@", status ?: @"<no response>"]];
         NSString *resp = [self sendToClickPortAndRead:@"98\n"];
         [self appendLog:[NSString stringWithFormat:@"capture probe response: %@", resp ?: @"<no response>"]];
     });
@@ -211,5 +222,6 @@
 }
 
 @end
+
 
 

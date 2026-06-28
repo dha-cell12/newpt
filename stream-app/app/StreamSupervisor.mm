@@ -3,6 +3,7 @@
 #import <signal.h>
 #import <sys/wait.h>
 #import <unistd.h>
+#import <errno.h>
 
 extern char **environ;
 
@@ -87,6 +88,27 @@ static const NSTimeInterval kSCRespawnThrottle = 3.0;
     });
 }
 
+- (void)killStaleStreamdLocked
+{
+    // During app upgrades, an older streamd may keep tcp/6000 bound while the
+    // new StreamControl process has no childPid to stop. Kill only the tool
+    // name we own before spawning a fresh bundled copy.
+    const char *paths[] = { "/usr/bin/killall", "/bin/killall", NULL };
+    for (int i = 0; paths[i] != NULL; i++) {
+        if (access(paths[i], X_OK) != 0) continue;
+        pid_t pid = -1;
+        char *const argv[] = { (char *)paths[i], (char *)"streamd", NULL };
+        int rc = posix_spawn(&pid, paths[i], NULL, NULL, argv, environ);
+        if (rc == 0 && pid > 0) {
+            int status = 0;
+            waitpid(pid, &status, 0);
+            [self emitLog:[NSString stringWithFormat:@"supervisor: stale streamd cleanup via %s status=%d", paths[i], status]];
+            usleep(250000);
+            return;
+        }
+    }
+    [self emitLog:@"supervisor: stale streamd cleanup skipped (killall unavailable)"];
+}
 - (void)spawnLocked
 {
     NSString *path = [self streamdPath];
@@ -94,6 +116,8 @@ static const NSTimeInterval kSCRespawnThrottle = 3.0;
         [self emitLog:[NSString stringWithFormat:@"supervisor: streamd not found at %@", path]];
         return;
     }
+
+    [self killStaleStreamdLocked];
 
     self->_lastSpawn = [NSDate date];
 
@@ -158,3 +182,5 @@ static const NSTimeInterval kSCRespawnThrottle = 3.0;
 }
 
 @end
+
+
