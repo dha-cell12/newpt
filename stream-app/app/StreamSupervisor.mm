@@ -4,8 +4,18 @@
 #import <sys/wait.h>
 #import <unistd.h>
 #import <errno.h>
+#import <sys/sysctl.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
 
 extern char **environ;
+
+#ifndef PROC_PIDPATHINFO_MAXSIZE
+#define PROC_PIDPATHINFO_MAXSIZE 4096
+#endif
+
+extern "C" int proc_pidpath(int pid, void *buffer, uint32_t buffersize);
 
 // ---------------------------------------------------------------------------
 // SCStreamSupervisor
@@ -90,24 +100,59 @@ static const NSTimeInterval kSCRespawnThrottle = 3.0;
 
 - (void)killStaleStreamdLocked
 {
-    // During app upgrades, an older streamd may keep tcp/6000 bound while the
-    // new StreamControl process has no childPid to stop. Kill only the tool
-    // name we own before spawning a fresh bundled copy.
-    const char *paths[] = { "/usr/bin/killall", "/bin/killall", NULL };
-    for (int i = 0; paths[i] != NULL; i++) {
-        if (access(paths[i], X_OK) != 0) continue;
-        pid_t pid = -1;
-        char *const argv[] = { (char *)paths[i], (char *)"streamd", NULL };
-        int rc = posix_spawn(&pid, paths[i], NULL, NULL, argv, environ);
-        if (rc == 0 && pid > 0) {
-            int status = 0;
-            waitpid(pid, &status, 0);
-            [self emitLog:[NSString stringWithFormat:@"supervisor: stale streamd cleanup via %s status=%d", paths[i], status]];
-            usleep(250000);
-            return;
-        }
+    pid_t selfPid = getpid();
+    int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0 };
+    size_t len = 0;
+    if (sysctl(mib, 4, NULL, &len, NULL, 0) != 0 || len == 0) {
+        [self emitLog:[NSString stringWithFormat:@"supervisor: stale streamd scan failed len=%zu errno=%d", len, errno]];
+        return;
     }
-    [self emitLog:@"supervisor: stale streamd cleanup skipped (killall unavailable)"];
+
+    struct kinfo_proc *procs = (struct kinfo_proc *)calloc(1, len);
+    if (!procs) {
+        [self emitLog:@"supervisor: stale streamd scan alloc failed"];
+        return;
+    }
+
+    if (sysctl(mib, 4, procs, &len, NULL, 0) != 0) {
+        [self emitLog:[NSString stringWithFormat:@"supervisor: stale streamd scan sysctl failed errno=%d", errno]];
+        free(procs);
+        return;
+    }
+
+    int count = (int)(len / sizeof(struct kinfo_proc));
+    int killed = 0;
+    for (int i = 0; i < count; i++) {
+        pid_t pid = procs[i].kp_proc.p_pid;
+        if (pid <= 1 || pid == selfPid) continue;
+
+        const char *comm = procs[i].kp_proc.p_comm;
+        BOOL isStreamd = (comm && strcmp(comm, "streamd") == 0);
+
+        if (!isStreamd) {
+            char pathbuf[PROC_PIDPATHINFO_MAXSIZE] = {0};
+            int got = proc_pidpath(pid, pathbuf, sizeof(pathbuf));
+            if (got > 0) {
+                const char *base = strrchr(pathbuf, '/');
+                base = base ? base + 1 : pathbuf;
+                isStreamd = (strcmp(base, "streamd") == 0);
+            }
+        }
+
+        if (!isStreamd) continue;
+
+        errno = 0;
+        int rc = kill(pid, SIGTERM);
+        [self emitLog:[NSString stringWithFormat:@"supervisor: stale streamd pid=%d kill rc=%d errno=%d", pid, rc, errno]];
+        if (rc == 0) killed++;
+    }
+    free(procs);
+
+    if (killed > 0) {
+        usleep(500000);
+    } else {
+        [self emitLog:@"supervisor: no stale streamd process found by sysctl"];
+    }
 }
 - (void)spawnLocked
 {

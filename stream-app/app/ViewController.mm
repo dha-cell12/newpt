@@ -19,6 +19,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <errno.h>
 
 @interface SCViewController () <SCStreamSupervisorDelegate>
 @end
@@ -98,10 +99,17 @@
 {
     [_supervisor start];
     [self appendLog:@"status probe scheduled; checking task 97 after spawn"];
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)),
+    [self scheduleStatusProbeAfter:0.8 label:@"status probe #1"];
+    [self scheduleStatusProbeAfter:2.0 label:@"status probe #2"];
+    [self scheduleStatusProbeAfter:4.0 label:@"status probe #3"];
+}
+
+- (void)scheduleStatusProbeAfter:(double)seconds label:(NSString *)label
+{
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(seconds * NSEC_PER_SEC)),
                    dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSString *resp = [self sendToClickPortAndRead:@"97\n"];
-        [self appendLog:[NSString stringWithFormat:@"streamd status response: %@", resp ?: @"<no response>"]];
+        [self appendLog:[NSString stringWithFormat:@"%@: %@", label, resp ?: @"<nil>"]];
     });
 }
 - (void)onStop { [_supervisor stop]; }
@@ -160,7 +168,7 @@
 - (NSString *)sendToClickPortAndRead:(NSString *)msg
 {
     int sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock < 0) return @"socket() failed";
+    if (sock < 0) return [NSString stringWithFormat:@"socket() failed errno=%d", errno];
 
     struct timeval tv;
     tv.tv_sec = 8;
@@ -176,7 +184,7 @@
 
     if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         close(sock);
-        return @"connect 127.0.0.1:6000 failed (streamd running?)";
+        return [NSString stringWithFormat:@"connect 127.0.0.1:6000 failed errno=%d", errno];
     }
 
     const char *buf = [msg UTF8String];
@@ -186,7 +194,7 @@
     ssize_t n = recv(sock, resp, sizeof(resp) - 1, 0);
     close(sock);
 
-    if (n <= 0) return @"no response / timeout";
+    if (n <= 0) return [NSString stringWithFormat:@"no response / timeout errno=%d", errno];
     resp[n] = 0;
     NSString *s = [NSString stringWithUTF8String:resp];
     return s ?: @"non-utf8 response";
