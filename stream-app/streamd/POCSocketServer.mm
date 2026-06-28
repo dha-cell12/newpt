@@ -81,8 +81,8 @@ static NSData *POCHandleLine(const char *line)
     }
 
     if (taskType == 97) {
-        const char *resp = "0;;streamd_phase=2 capture_probe=1 tasks=10,97,98,99\r\n";
-        POCLogf("socket: task97 version -> phase2");
+        const char *resp = "0;;streamd_phase=3 capture_probe=1 video=1 ports=7001,7002,7003,7004,7005,7006 tasks=10,97,98,99\r\n";
+        POCLogf("socket: task97 version -> phase3");
         return [NSData dataWithBytes:resp length:strlen(resp)];
     }
 
@@ -107,7 +107,7 @@ static NSData *POCHandleLine(const char *line)
         return [NSData dataWithBytes:resp length:strlen(resp)];
     }
 
-    // Phase 2 scope: task 10 = touch, task 97 = version, task 98 = capture probe, task 99 = ping.
+    // Phase 3 scope: task 10 = touch, task 97 = version, task 98 = capture probe, task 99 = ping.
     POCLogf("socket: unsupported task %d line='%s'", taskType, line);
     const char *resp = "1;;streamd_supports_task_10_97_98_99\r\n";
     return [NSData dataWithBytes:resp length:strlen(resp)];

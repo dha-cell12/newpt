@@ -7,16 +7,17 @@
 #import "TouchInjector.h"
 #import "POCSocketServer.h"
 #import "StreamCaptureProbe.h"
+#import "H264Stream.h"
 
 // ---------------------------------------------------------------------------
 // streamd - unified click + stream daemon (NON-root)
 //
-// Phase 2: click path + capture probe are now live.
+// Phase 3: click path + capture probe + video streaming are now live.
 //   - POCTouchInit() initializes screen geometry, dispatch variant, senderID cache.
 //   - POCStartSocketServer() listens on TCP 6000 and handles legacy task 10.
 //   - SCStreamScheduleStartupCaptureProbe() verifies capture entitlement at startup.
 //
-// Continuous H.264 streaming will be added in Phase 3.
+// Video stream ports: 7001 fast, 7002 eco, 7003 raw, 7004 raw-worker, 7005 lan, 7006 wan.
 // ---------------------------------------------------------------------------
 
 static void streamdLog(const char *msg)
@@ -37,7 +38,7 @@ int main(int argc, char *argv[])
         }
 
         streamdLog(daemon ? "starting (daemon mode)" : "starting (foreground)");
-        streamdLog("phase 2: initializing click/touch + capture probe subsystem");
+        streamdLog("phase 3: initializing click/touch + capture + video subsystem");
 
         POCTouchInit();
         POCStartSocketServer();
@@ -45,6 +46,9 @@ int main(int argc, char *argv[])
         streamdLog("click server requested on tcp/6000");
         streamdLog("phase 2: scheduling startup capture probe");
         SCStreamScheduleStartupCaptureProbe(2.0);
+
+        streamdLog("phase 3: starting video stream servers on ports 7001-7006");
+        startH264StreamServer();
 
         // Heartbeat timer so we can confirm the process is alive in logs.
         __block unsigned long ticks = 0;
