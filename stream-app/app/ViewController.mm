@@ -30,6 +30,7 @@
     UIButton *_startButton;
     UIButton *_stopButton;
     UIButton *_tapButton;
+    UIButton *_captureButton;
 }
 
 - (void)viewDidLoad
@@ -68,6 +69,10 @@
     [self.view addSubview:_tapButton];
     y += 56;
 
+    _captureButton = [self makeButton:@"Capture probe" action:@selector(onCaptureProbe) frame:CGRectMake(margin, y, width, 44)];
+    [self.view addSubview:_captureButton];
+    y += 56;
+
     _logView = [[UITextView alloc] initWithFrame:CGRectMake(margin, y, width, self.view.bounds.size.height - y - margin)];
     _logView.editable = NO;
     _logView.font = [UIFont fontWithName:@"Menlo" size:11] ?: [UIFont systemFontOfSize:11];
@@ -92,6 +97,15 @@
 - (void)onStart { [_supervisor start]; }
 - (void)onStop { [_supervisor stop]; }
 
+- (void)onCaptureProbe
+{
+    [self appendLog:@"capture probe: sending task 98"];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSString *resp = [self sendToClickPortAndRead:@"98\n"];
+        [self appendLog:[NSString stringWithFormat:@"capture probe response: %@", resp ?: @"<no response>"]];
+    });
+}
+
 // Send a legacy task-10 tap at screen center to streamd's click port (6000).
 - (void)onSelfTestTap
 {
@@ -114,7 +128,7 @@
 - (void)sendToClickPort:(NSString *)msg
 {
     int sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock < 0) { [self appendLog:@"self-test: socket() failed"]; return; }
+    if (sock < 0) { [self appendLog:@"socket: socket() failed"]; return; }
 
     struct sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));
@@ -123,13 +137,48 @@
     inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr);
 
     if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-        [self appendLog:@"self-test: connect 127.0.0.1:6000 failed (streamd running?)"];
+        [self appendLog:@"socket: connect 127.0.0.1:6000 failed (streamd running?)"];
         close(sock);
         return;
     }
     const char *buf = [msg UTF8String];
     send(sock, buf, strlen(buf), 0);
     close(sock);
+}
+
+- (NSString *)sendToClickPortAndRead:(NSString *)msg
+{
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0) return @"socket() failed";
+
+    struct timeval tv;
+    tv.tv_sec = 8;
+    tv.tv_usec = 0;
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(6000);
+    inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr);
+
+    if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        close(sock);
+        return @"connect 127.0.0.1:6000 failed (streamd running?)";
+    }
+
+    const char *buf = [msg UTF8String];
+    send(sock, buf, strlen(buf), 0);
+
+    char resp[1024];
+    ssize_t n = recv(sock, resp, sizeof(resp) - 1, 0);
+    close(sock);
+
+    if (n <= 0) return @"no response / timeout";
+    resp[n] = 0;
+    NSString *s = [NSString stringWithUTF8String:resp];
+    return s ?: @"non-utf8 response";
 }
 
 - (void)appendLog:(NSString *)line
@@ -162,4 +211,5 @@
 }
 
 @end
+
 

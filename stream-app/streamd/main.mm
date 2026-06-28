@@ -6,6 +6,7 @@
 
 #import "TouchInjector.h"
 #import "POCSocketServer.h"
+#import "StreamCaptureProbe.h"
 
 // ---------------------------------------------------------------------------
 // streamd - unified click + stream daemon (NON-root)
@@ -41,6 +42,8 @@ int main(int argc, char *argv[])
         POCStartSocketServer();
 
         streamdLog("click server requested on tcp/6000");
+        streamdLog("phase 2: scheduling startup capture probe");
+        SCStreamScheduleStartupCaptureProbe(2.0);
 
         // Heartbeat timer so we can confirm the process is alive in logs.
         __block unsigned long ticks = 0;
@@ -64,3 +67,4 @@ int main(int argc, char *argv[])
     }
     return 0;
 }
+

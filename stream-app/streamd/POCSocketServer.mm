@@ -6,6 +6,7 @@
 
 #include "POCSocketServer.h"
 #include "TouchInjector.h"
+#import "StreamCaptureProbe.h"
 
 // ---------------------------------------------------------------------------
 // POC socket server
@@ -79,15 +80,26 @@ static NSData *POCHandleLine(const char *line)
         return nil; // keep legacy touch fire-and-forget
     }
 
+    if (taskType == 98) {
+        __block NSString *summary = nil;
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            summary = SCStreamRunCaptureProbe(@"socket98");
+        });
+        NSString *response = [NSString stringWithFormat:@"0;;%@\r\n", summary ?: @"capture_socket98 result=FAIL png=<none>"];
+        NSData *data = [response dataUsingEncoding:NSUTF8StringEncoding];
+        POCLogf("socket: task98 capture probe -> %s", [response UTF8String]);
+        return data;
+    }
+
     if (taskType == 99) {
         const char *resp = "0;;poc_alive\r\n";
         POCLogf("socket: task99 ping -> poc_alive");
         return [NSData dataWithBytes:resp length:strlen(resp)];
     }
 
-    // POC scope: only touch is implemented.
+    // Phase 2 scope: task 10 = touch, task 98 = capture probe, task 99 = ping.
     POCLogf("socket: unsupported task %d line='%s'", taskType, line);
-    const char *resp = "1;;poc_only_supports_task_10\r\n";
+    const char *resp = "1;;streamd_supports_task_10_98_99\r\n";
     return [NSData dataWithBytes:resp length:strlen(resp)];
 }
 
@@ -289,3 +301,4 @@ void POCStartSocketServer(void)
     thread.name = @"poc-socket-server";
     [thread start];
 }
+
